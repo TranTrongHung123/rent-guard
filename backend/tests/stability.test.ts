@@ -78,6 +78,8 @@ test('edited history is rejected; model/policy changes never reuse a prior repor
   assert.equal(fresh.report.analysis?.reuse, 'none'); assert.equal(ai.analysisCalls, 1);
   assert.notEqual(fresh.report.analysis?.policyId, previous.report.analysis?.policyId);
   assert.notEqual(analysisPolicyId(config), analysisPolicyId({ ...config, signingSecret: 'a-different-secret-for-this-test-only' }));
+  assert.notEqual(analysisPolicyId(config), analysisPolicyId({ ...config, reasoningEffort: 'low' }));
+  assert.notEqual(analysisPolicyId({ ...config, reasoningEffort: 'low' }), analysisPolicyId({ ...config, reasoningEffort: 'low', analysisReasoningEffort: 'medium' }));
   // Explicit fresh run can recover from damaged history without trusting it.
   await request(app).post('/api/analyses').send({ ...images(), previousAnalysis: edited, forceRefresh: true }).expect(200);
 });

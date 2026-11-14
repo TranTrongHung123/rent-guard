@@ -23,7 +23,9 @@ Mobile trên điện thoại phải dùng địa chỉ IPv4 LAN của laptop, v�
 | Biến | Mặc định | Ý nghĩa |
 | --- | --- | --- |
 | `OPENAI_API_KEY` | rỗng | Khóa thật phía server |
-| `OPENAI_MODEL` | `gpt-4.1-mini` | Model hỗ trợ Vision + Structured Outputs |
+| `OPENAI_MODEL` | `gpt-6.1-sol` | Model hỗ trợ Vision + Structured Outputs |
+| `OPENAI_REASONING_EFFORT` | `low` với Sol; rỗng với model khác | Effort cho OCR, grounding và chat |
+| `OPENAI_ANALYSIS_REASONING_EFFORT` | theo effort chung | Effort riêng cho phân tích; `.env.example` chọn `medium` |
 | `HOST` / `PORT` | `0.0.0.0` / `4000` | Lắng nghe LAN |
 | `OPENAI_TIMEOUT_MS` | `120000` | Timeout từng lời gọi OpenAI |
 | `MAX_PAGES` | `20` | Giới hạn tài nguyên mỗi lần, có thể cấu hình 1–50 |
@@ -62,7 +64,7 @@ Kiểm chứng giảm rủi ro, không chứng minh OCR đúng với ảnh hoặ
 
 ## Ổn định kết quả và phân tích lại
 
-`src/stability.ts` tạo SHA-256 cho bộ ảnh theo thứ tự (không gồm ID picker), chuẩn hóa ID trước khi gọi AI và quản lý cache RAM có TTL/LRU. Hai cache ảnh/văn bản có giới hạn riêng 32 báo cáo và 8 MiB, tổng tối đa 16 MiB nội dung JSON. Không lưu hợp đồng lên đĩa. Khóa chính sách phụ thuộc phiên bản `rentguard-v2.0.1`, model, quy tắc và secret; sửa prompt/schema phải tăng `ANALYSIS_VERSION`.
+`src/stability.ts` tạo SHA-256 cho bộ ảnh theo thứ tự (không gồm ID picker), chuẩn hóa ID trước khi gọi AI và quản lý cache RAM có TTL/LRU. Hai cache ảnh/văn bản có giới hạn riêng 32 báo cáo và 8 MiB, tổng tối đa 16 MiB nội dung JSON. Không lưu hợp đồng lên đĩa. Khóa chính sách phụ thuộc phiên bản `rentguard-v2.1.0`, model, effort chung/phân tích, quy tắc và secret; sửa prompt/schema phải tăng `ANALYSIS_VERSION`.
 
 - AI phải xác nhận đã rà soát đủ 16 mã trong `reviewedChecks`, không thiếu/lặp; code gán mức ưu tiên theo `checkId`, loại trùng theo mã/vị trí và sắp thứ tự cố định. Mỗi mã có thể có nhiều phát hiện ở các điều khoản khác nhau.
 - Ảnh trùng byte, đúng thứ tự: dùng lại báo cáo đã kiểm chứng, không OCR/phân tích lại.
@@ -71,7 +73,13 @@ Kiểm chứng giảm rủi ro, không chứng minh OCR đúng với ảnh hoặ
 - `forceRefresh:true` luôn đọc/phân tích lại. Mobile có nút **Đọc lại từ ảnh**, giữ nguyên bản cũ và tạo báo cáo riêng. `report.analysis` ghi phiên bản, fingerprint, ngày phân tích gốc và `reuse: none/images/text/saved`; các trường này cũng được ký.
 - Các yêu cầu đồng thời cùng đầu vào chia sẻ một công việc. Một người hủy không hủy người còn chờ; tất cả hủy thì dừng OpenAI, không cache lỗi/kết quả bị hủy.
 
-Sampling dùng `temperature:0` khi model hỗ trợ; chỉ bỏ tham số và thử lại nếu provider trả 400 nêu rõ `param=temperature` với `unsupported_parameter/unsupported_value`, hoặc code rỗng kèm thông báo rõ `Unsupported parameter/value: temperature`. Trường hợp code rỗng đã được xác nhận bằng API thật. Không thử lại kiểu này với lỗi quyền, quota hay đầu vào khác. Temperature thấp không bảo đảm AI tất định. Ảnh mới có OCR khác, cache hết hạn mà không có báo cáo ký phù hợp, model/quy tắc đổi hoặc chủ động đọc lại vẫn có thể cho danh sách khác. Để kiểm tra phiên bản mới, phân tích mới một lần; báo cáo cũ giữ nguyên và vẫn mở được.
+Với reasoning effort khác `none`, không gửi `temperature`; profile Sol chọn `low` cho OCR/kiểm chứng/chat và `medium` cho phân tích. Với model cũ không hỗ trợ reasoning, để cả hai effort rỗng. Các giá trị được nhận là `none/low/medium/high/xhigh/max`; Sol/Astra không nhận `none`, cấu hình sai bị từ chối lúc startup. Khi không dùng reasoning hoặc effort `none`, sampling thử `temperature:0` và chỉ fallback nếu HTTP400 chỉ rõ tham số không được hỗ trợ (kể cả code rỗng đã xác nhận trên API thật). Không bỏ qua lỗi quyền/quota/đầu vào khác. Các thiết lập này không bảo đảm AI tất định; đổi model/effort/quy tắc hoặc OCR mới khác có thể cho danh sách khác. Báo cáo cũ giữ nguyên, dùng Đọc lại từ ảnh để tạo bản mới.
+
+## Đo model trên mẫu
+
+`npm run benchmark:models` là kiểm thử opt-in có phí, gọi OpenAI thật với đúng hai ảnh mẫu của dự án. So sánh Terra mặc định với Sol `low`/phân tích `medium`, mỗi profile phân tích mới, hỏi hai lượt có trích dẫn và kiểm tra ảnh trùng. In/lưu thời gian, usage và mã check tại `test-results/`, không ghi ảnh, OCR hoặc khóa. Mỗi profile chạy một lần; không dùng làm kết luận chất lượng/tốc độ chung. Kết quả đo hiện tại và các mục mẫu chưa nhận diện nằm trong [TESTING.md](../docs/TESTING.md#so-sánh-model-trên-mẫu).
+
+Sol có đơn giá token Standard cao khoảng gấp2 Terra ($2/$10 so với $1/$5 cho input/output mỗi1M token ngắn, theo tài liệu hiện tại); số token, cache, ảnh và các bước xử lý quyết định chi phí mỗi hợp đồng. Không tự bật thêm Fast/Ultrafast. Xem [Sol](https://developers.openai.com/api/docs/models/gpt-6.1-sol), [Terra](https://developers.openai.com/api/docs/models/gpt-6.1-terra) và [hướng dẫn reasoning](https://developers.openai.com/api/docs/guides/latest-model).
 
 ## Kiểm thử
 

@@ -13,7 +13,7 @@ Ngày kiểm tra: **14/11/2026** (Asia/Saigon). Môi trường: Windows, Node.js
 | `npx expo-doctor` | **20/20 đạt**, dependencies/config tương thích SDK58 |
 | `npx expo export --platform all` | Đạt, Hermes bundle Android/iOS và static web với đầy đủ9 routes |
 | Backend `npm run typecheck` | Đạt |
-| Backend `npm test` | **35/35 đạt**, không gọi OpenAI thật; gồm cache, checklist, mức cố định, chữ ký, sampling fallback (kể cả code rỗng) và hủy đồng thời |
+| Backend `npm test` | **38/38 đạt**, không gọi OpenAI thật; gồm reasoning theo bước, không gửi temperature cùng reasoning, cấu hình sai/legacy, cache và các regression trước đó |
 | Backend `npm run build` | Đạt, tạo Node output chạy được |
 | Backend chạy thực tế | Bản build v2 khởi động cổng loopback tạm và health200, `aiConfigured:true`, model cục bộ được giữ nguyên; không gọi OpenAI. Server kiểm thử đã đóng |
 | Dependency tree | Không lỗi missing/invalid trong `npm ls`; Expo SDK không bị nâng/hạ |
@@ -23,6 +23,19 @@ Ngày kiểm tra: **14/11/2026** (Asia/Saigon). Môi trường: Windows, Node.js
 Mobile tests bao gồm API qua HTTP fixture cục bộ, body nhiều trang và lịch sử chat, lỗi thiếu khóa không fallback,502 HTML, JSON sai, timeout/hủy/mạng, URL sai, thứ tự trang, xác thực JSON sâu và trích dẫn, sample source labels, lưu/mở lại hội thoại, dữ liệu hỏng, lỗi ghi/đọc, xóa biệt lập. Có kiểm tra đường dẫn ảnh tương đối, migration từ đường dẫn cũ, tái tạo URI sau khi iOS đổi container và dạng đường dẫn Expo Go Android/iOS được đối chiếu với mã nguồn SDK58. AsyncStorage được thay bằng bộ nhớ fixture trong tests; tests xác minh code lưu trữ nhưng không giả định đã chạy native module trên điện thoại.
 
 Backend tests bao gồm toàn bộ trang đúng thứ tự, partial/unreadable,42 phát hiện không bị giới hạn số mục, trích sai tiền/dấu/trang/offset, thiếu/lặp semantic review, câu hỏi gợi ý qua kiểm chứng, chat nhiều lượt và câu trả lời dài, báo cáo bị sửa, HMAC/version/migration, lỗi provider. Một nhóm test dùng OpenAI SDK thật với HTTP transport fixture để kiểm tra Responses Vision, strict Structured Outputs và `store:false`; không phải một lần gọi dịch vụ OpenAI thật.
+
+## So sánh model trên mẫu
+
+Đã chạy `npm run benchmark:models` ngày14/11/2026, một lượt mỗi profile với hai ảnh mẫu của dự án, cùng pipeline v2.1.0 và `forceRefresh`. Có gọi OpenAI thật; không dùng cache ảnh để tính thời gian phân tích.
+
+| Profile | Phân tích | Hỏi đầu (kèm kiểm chứng) | Hỏi tiếp (kèm kiểm chứng) | Tổng luồng | Mã vấn đề mẫu nhận diện |
+| --- | --- | --- | --- | --- | --- |
+| Terra, effort mặc định | 29,32s | 4,40s | 10,29s | 44,03s | 3/4 |
+| Sol, low/phân tích medium | 24,75s | 6,04s | 9,41s | 40,21s | 3/4 |
+
+Trong lượt thử, Sol phân tích nhanh hơn khoảng16%, tổng luồng nhanh hơn khoảng9%, nhưng câu hỏi đầu chậm hơn. Cả hai đọc đủ hai trang, cả hai lượt hỏi có trích dẫn, ảnh trùng giữ nguyên kết quả. Bốn mã mẫu được xác định trước từ tài liệu giả định: mất cọc, tăng giá, phí chưa xác định, sửa chữa không giới hạn. Đầu ra đã kiểm chứng của Terra chưa có `FEES_UNSPECIFIED`; Sol chưa có `REPAIRS_UNLIMITED`. Đây là kiểm tra phạm vi trên một mẫu, **không phải độ chính xác75% hay bằng chứng model này tốt hơn trên mọi hợp đồng**. Terra có1468 input tokens được provider cache ở bước phân tích; Sol không có cache hit trong lượt đo. Latency còn phụ thuộc tải dịch vụ, cache và tài liệu.
+
+Metadata gồm thời gian từng lời gọi, token/reasoning token, trạng thái HTTP và mã check tại `backend/test-results/model-benchmark-2026-11-14T09-21-48-540Z.json` (ignore); không lưu hợp đồng/khóa. Đã áp dụng Sol `low`/phân tích `medium` trong `.env` cục bộ, giữ nguyên API Key; bản build Backend trả health200, modelSol, pipelinev2.1.0. APK1.0.1 dùng được cấu hình mới, không cần build lại.
 
 ## Kiểm tra dependencies
 

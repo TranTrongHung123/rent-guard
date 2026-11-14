@@ -53,7 +53,7 @@ Mobile gửi tùy chọn `previousAnalysis:{report,analysisToken}` để khôi p
 
 `SingleFlight` gộp công việc đồng thời theo ảnh/text, tách luồng đọc lại chủ động. Hủy một subscriber không hủy các subscriber khác; khi hết người chờ, abort truyền tới OpenAI và không ghi cache. Lỗi/schema thiếu không được cache.
 
-Mọi bước dùng `temperature:0` khi được hỗ trợ. Chỉ fallback bỏ tham số khi HTTP400 chỉ rõ `param=temperature` và code `unsupported_parameter/unsupported_value`, hoặc code rỗng kèm thông báo rõ `Unsupported parameter/value: temperature`; ghi nhớ khả năng trong phiên Backend. Trường hợp code rỗng đã được xác nhận bằng API thật và bổ sung regression test trong pipeline `rentguard-v2.0.1`. Điều này giảm biến động sampling, **không bảo đảm tất định**. AI vẫn có thể chọn mã/bằng chứng khác hoặc kiểm chứng khác; OCR ảnh mới cũng có thể khác. Không hứa cùng hợp đồng vật lý luôn cho số phát hiện giống nhau. Cache bảo toàn một kết quả đã kiểm chứng, không chứng minh kết quả đó đầy đủ hoặc đúng với ảnh.
+Pipeline `rentguard-v2.1.0` hỗ trợ reasoning effort theo bước: Sol dùng `low` cho OCR/kiểm chứng/chat, `medium` cho phân tích theo cấu hình đề xuất. Khi effort khác `none`, bỏ hẳn `temperature` theo hướng dẫn API. Các model không cấu hình reasoning vẫn thử `temperature:0`; chỉ fallback với HTTP400 chỉ rõ `param=temperature` không được hỗ trợ, bao gồm trường hợp code rỗng đã kiểm thử thật. Model và cả hai effort được đưa vào khóa chính sách, tránh dùng lại báo cáo từ cấu hình cũ. Điều này **không bảo đảm tất định** hoặc chứng minh Sol chính xác hơn trên mọi hợp đồng. Cache bảo toàn một kết quả đã kiểm chứng, không chứng minh kết quả đó đầy đủ hoặc đúng với ảnh.
 
 ## JSON cuối cùng và nguồn kết quả
 

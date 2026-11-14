@@ -24,8 +24,10 @@ export class OpenAIService implements StructuredAI {
   private async structured<T extends z.ZodType>(schema: T, name: string, instructions: string, input: OpenAI.Responses.ResponseInput, maxTokens: number, signal?: AbortSignal): Promise<z.infer<T>> {
     if (!this.client) throw new AppError(503, 'AI_NOT_CONFIGURED', 'Backend chưa được cấu hình OpenAI API Key. Hãy thêm khóa trong backend/.env rồi khởi động lại backend.');
     try {
+      const effort = name === 'contract_analysis' ? this.config.analysisReasoningEffort ?? this.config.reasoningEffort : this.config.reasoningEffort;
       const body = {
         model: this.config.model,
+        ...(effort ? { reasoning: { effort } } : {}),
         store: false,
         instructions: `${SAFETY_INSTRUCTIONS}\n${instructions}`,
         input,
@@ -34,7 +36,8 @@ export class OpenAIService implements StructuredAI {
       };
       let result;
       try {
-        result = await this.client.responses.parse({ ...body, ...(this.temperatureSupported ? { temperature: 0 } : {}) }, { signal });
+        // Reasoning models reject sampling parameters when effort is non-none.
+        result = await this.client.responses.parse({ ...body, ...(this.temperatureSupported && (!effort || effort === 'none') ? { temperature: 0 } : {}) }, { signal });
       } catch (error) {
         // Retry only an explicit unsupported sampling parameter, not unrelated
         // input/auth/quota/network errors. Reasoning models may omit temperature.

@@ -17,7 +17,7 @@ Copy-Item .env.example .env
 npm run dev
 ```
 
-Để dùng AI thật, tự điền `OPENAI_API_KEY` trong `backend/.env` bằng trình soạn thảo và khởi động lại Backend. Không gửi khóa qua hội thoại, không đưa vào Mobile hoặc biến `EXPO_PUBLIC_*`. Model mặc định là `gpt-4.1-mini`; có thể đổi `OPENAI_MODEL` sang model hỗ trợ Vision và Structured Outputs.
+Để dùng AI thật, tự điền `OPENAI_API_KEY` trong `backend/.env` bằng trình soạn thảo và khởi động lại Backend. Không gửi khóa qua hội thoại, không đưa vào Mobile hoặc biến `EXPO_PUBLIC_*`. Cấu hình đề xuất hiện tại là `OPENAI_MODEL=gpt-6.1-sol`, `OPENAI_REASONING_EFFORT=low`, `OPENAI_ANALYSIS_REASONING_EFFORT=medium`: giữ mức vừa cho phân tích, mức thấp cho OCR/kiểm chứng/hỏi đáp. Đổi model hoặc effort chỉ cần chạy lại Backend, không cần build lại APK. Báo cáo cũ giữ nguyên; dùng Đọc lại từ ảnh để tạo kết quả mới.
 
 Mở `http://localhost:4000/api/health` để kiểm tra. `aiConfigured: true` chỉ cho biết đã có cấu hình khóa; một lần phân tích thành công mới chứng minh kết nối OpenAI. Khi chưa có khóa, API phân tích trả `503 AI_NOT_CONFIGURED` rõ ràng, không trả kết quả mẫu.
 

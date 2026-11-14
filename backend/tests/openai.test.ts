@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import OpenAI from 'openai';
 import { OpenAIService } from '../src/ai.js';
 import { AppError } from '../src/errors.js';
-import { config, page, png } from './helpers.js';
+import { candidate, config, page, png, unsignedReport } from './helpers.js';
+import type { Config } from '../src/config.js';
 
-function sdkWithResponse(output: unknown, options: { status?: string; refusal?: boolean; httpStatus?: number; rejectTemperature?: boolean; errorParam?: string; errorCode?: string | null; errorMessage?: string } = {}) {
+function sdkWithResponse(output: unknown, options: { status?: string; refusal?: boolean; httpStatus?: number; rejectTemperature?: boolean; errorParam?: string; errorCode?: string | null; errorMessage?: string } = {}, settings: Config = config) {
   const requests: Record<string, unknown>[] = [];
   const client = new OpenAI({ apiKey: 'test-placeholder-no-external-request', maxRetries: 0, fetch: async (_url, init) => {
     requests.push(JSON.parse(init?.body as string));
@@ -15,7 +16,7 @@ function sdkWithResponse(output: unknown, options: { status?: string; refusal?: 
       output: [{ id: 'msg_test', type: 'message', role: 'assistant', status: 'completed', content: [options.refusal ? { type: 'refusal', refusal: 'Test refusal' } : { type: 'output_text', text: JSON.stringify(output), annotations: [] }] }],
     }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   } });
-  return { ai: new OpenAIService(config, client), requests };
+  return { ai: new OpenAIService(settings, client), requests };
 }
 test('real SDK transport uses Responses Vision, high detail, strict schema and store false', async () => {
   const { ai, requests } = sdkWithResponse({ status: 'readable', text: page.text, warning: null });
@@ -75,4 +76,32 @@ test('SDK refusal, incomplete output and authentication/quota errors are explici
 test('schema-invalid provider content never becomes a report', async () => {
   const { ai } = sdkWithResponse({ status: 'readable', text: 123, warning: null });
   await assert.rejects(() => ai.extract({ id: 'page-1', dataUrl: png }, 1), (error: unknown) => error instanceof AppError && error.code === 'AI_INVALID_RESPONSE');
+});
+test('balanced reasoning profile uses low for OCR, review and chat, medium for analysis; never sends temperature', async () => {
+  const settings: Config = { ...config, model: 'gpt-6.1-sol', reasoningEffort: 'low', analysisReasoningEffort: 'medium' };
+  const cases = [
+    { output: { status: 'readable', text: page.text, warning: null }, invoke: (ai: OpenAIService) => ai.extract({ id: 'page-1', dataUrl: png }, 1), effort: 'low' },
+    { output: candidate, invoke: (ai: OpenAIService) => ai.analyze([page]), effort: 'medium' },
+    { output: { reviews: [] }, invoke: (ai: OpenAIService) => ai.review([], [page]), effort: 'low' },
+    { output: { claims: [], insufficientInformation: true }, invoke: (ai: OpenAIService) => ai.answer({ report: unsignedReport, analysisToken: 'fixture', question: 'Tiền cọc?', messages: [] }), effort: 'low' },
+  ];
+  for (const item of cases) {
+    const { ai, requests } = sdkWithResponse(item.output, {}, settings);
+    await item.invoke(ai);
+    assert.equal(requests.length, 1);
+    assert.deepEqual(requests[0]!.reasoning, { effort: item.effort });
+    assert.equal(requests[0]!.model, 'gpt-6.1-sol');
+    assert.equal('temperature' in requests[0]!, false);
+    assert.equal(requests[0]!.store, false);
+  }
+});
+test('none reasoning retains sampling, and analysis effort inherits the configured global effort', async () => {
+  const none = sdkWithResponse({ status: 'readable', text: page.text, warning: null }, {}, { ...config, model: 'gpt-6.1-terra', reasoningEffort: 'none' });
+  await none.ai.extract({ id: 'page-1', dataUrl: png }, 1);
+  assert.equal(none.requests[0]!.temperature, 0);
+  assert.deepEqual(none.requests[0]!.reasoning, { effort: 'none' });
+  const inherited = sdkWithResponse(candidate, {}, { ...config, reasoningEffort: 'high' });
+  await inherited.ai.analyze([page]);
+  assert.deepEqual(inherited.requests[0]!.reasoning, { effort: 'high' });
+  assert.equal('temperature' in inherited.requests[0]!, false);
 });

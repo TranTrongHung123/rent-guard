@@ -12,7 +12,8 @@
     "start": "node dist/backend/src/server.js",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
-    "test:live": "tsx src/live-smoke.ts"
+    "test:live": "tsx src/live-smoke.ts",
+    "benchmark:models": "tsx src/model-benchmark.ts"
   },
   "dependencies": {
     "cors": "^2.8.6",

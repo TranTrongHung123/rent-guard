@@ -10,14 +10,29 @@ function numberEnv(name: string, fallback: number, min: number, max: number): nu
   if (!Number.isInteger(value) || value < min || value > max) throw new Error(`Invalid ${name}`);
   return value;
 }
+export type ReasoningEffort = 'none' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+function effortEnv(name: string, fallback?: ReasoningEffort): ReasoningEffort | undefined {
+  const value = process.env[name]?.trim();
+  if (!value) return fallback;
+  if (!['none', 'low', 'medium', 'high', 'xhigh', 'max'].includes(value)) throw new Error(`Invalid ${name}: use none, low, medium, high, xhigh or max`);
+  return value as ReasoningEffort;
+}
 export interface Config {
   port: number; host: string; apiKey: string; model: string; timeoutMs: number;
   maxPages: number; maxImageBytes: number; maxTotalImageBytes: number;
   corsOrigins: string[]; signingSecret: string;
   analysisCacheTtlMs?: number;
   analysisCacheEntries?: number;
+  reasoningEffort?: ReasoningEffort;
+  analysisReasoningEffort?: ReasoningEffort;
 }
 export function loadConfig(): Config {
+  const model = process.env.OPENAI_MODEL?.trim() || 'gpt-6.1-sol';
+  const reasoningEffort = effortEnv('OPENAI_REASONING_EFFORT', model === 'gpt-6.1-sol' ? 'low' : undefined);
+  const analysisReasoningEffort = effortEnv('OPENAI_ANALYSIS_REASONING_EFFORT', reasoningEffort);
+  if (/^gpt-(?:6\.1-sol|6-astra)(?:-|$)/.test(model) && [reasoningEffort, analysisReasoningEffort].includes('none')) {
+    throw new Error('This model does not support reasoning effort none; use low or higher');
+  }
   let signingSecret = process.env.REPORT_SIGNING_SECRET?.trim() || '';
   if (signingSecret && signingSecret.length < 32) throw new Error('REPORT_SIGNING_SECRET must be at least 32 characters');
   if (!signingSecret) {
@@ -31,7 +46,7 @@ export function loadConfig(): Config {
   return {
     port: numberEnv('PORT', 4000, 1, 65535), host: process.env.HOST || '0.0.0.0',
     apiKey: process.env.OPENAI_API_KEY?.trim() || '',
-    model: process.env.OPENAI_MODEL?.trim() || 'gpt-4.1-mini',
+    model, reasoningEffort, analysisReasoningEffort,
     timeoutMs: numberEnv('OPENAI_TIMEOUT_MS', 120_000, 1000, 300_000),
     maxPages: numberEnv('MAX_PAGES', 20, 1, 50),
     maxImageBytes: numberEnv('MAX_IMAGE_MB', 5, 1, 10) * 1024 * 1024,
