@@ -8,7 +8,7 @@ Ngày kiểm tra: **14/11/2026** (Asia/Saigon). Môi trường: Windows, Node.js
 | --- | --- |
 | Mobile `npm run typecheck` | Đạt, TypeScript strict, không có lỗi |
 | Mobile `npm run lint` | Đạt, không lỗi/cảnh báo ESLint |
-| Mobile `npm test` | **33/33 đạt**, không gọi OpenAI |
+| Mobile `npm test` | **36/36 đạt**, không gọi OpenAI; gồm3 regression tests lỗi mạng Expo SDK58 |
 | Mobile `npm run check:contracts` | Đạt, types Mobile khớp shared chuẩn |
 | `npx expo-doctor` | **20/20 đạt**, dependencies/config tương thích SDK58 |
 | `npx expo export --platform all` | Đạt, Hermes bundle Android/iOS và static web với đầy đủ9 routes |
@@ -29,6 +29,10 @@ Backend tests bao gồm toàn bộ trang đúng thứ tự, partial/unreadable,4
 Backend `npm audit --omit=dev`: **0 vulnerabilities**. Mobile `npm audit`: **8 moderate**,0 high/critical; production-only audit:3 moderate. Các cảnh báo đi qua `minimatch` trong Expo fingerprint và TypeScript ESLint. `npm audit fix --dry-run` không đưa ra thay đổi tương thích; fix force đề xuất hạ Expo về52, vì vậy không thực hiện. Giữ nguyên SDK58 theo yêu cầu; không cưỡng ép major override cho thư viện build. Đây là vấn đề dependency còn tồn tại và cần kiểm tra bản vá upstream trước khi phát hành rộng.
 
 ## Phần chưa xác nhận thực tế
+
+Cập nhật từ thử nghiệm iPhone ngày14/11/2026: ảnh người dùng cung cấp cho thấy Safari nhận health200 và app hiển thị2 trang đã chọn, nhưng phân tích báo lỗi kết nối. Kiểm tra lại từ laptop cũng nhận200 qua loopback và IP LAN. Chưa xác nhận URL đã lưu/quyền mạng của Expo Go hoặc một lần phân tích thành công trên điện thoại. `aiConfigured:true` vẫn chỉ là có cấu hình khóa.
+
+Đã tái hiện lỗi wrapper để lọt `FetchError extends Error` của SDK58 (chỉ bắt TypeError trước đây), sửa để bắt lỗi tại chính fetch, thông báo URL đang gọi và hướng dẫn LAN/quyền iPhone.36 tests đạt, gồm native FetchError, localhost/IPv6 loopback và lỗi khác realm; HTTP, JSON, timeout và hủy vẫn tách biệt. Chưa đổi fetch stack, cấu hình khóa hay model. Sửa thông báo không tự cấp quyền hoặc thay URL đã lưu. Bản APK ở cuối tài liệu được tạo trước sửa JavaScript này; Expo Go dùng source hiện tại sau khi reload.
 
 - **OpenAI thật:** chưa có API Key. Chưa đo độ chính xác OCR, phát hiện điều khoản, độ trễ/chi phí hoặc hỏi đáp trên hợp đồng thật. Không coi test fixture hay `aiConfigured:true` là bằng chứng kết nối thực.
 - **Android/iOS thật:** chưa có thiết bị/emulator/ADB kết nối trong phiên này. Chưa xác nhận quyền camera/thư viện, keyboard, notch, phóng to, khởi động lại app, cập nhật iOS container hoặc độ ổn định bộ nhớ trên thiết bị thật.

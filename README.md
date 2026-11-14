@@ -31,6 +31,8 @@ Dùng Expo Go tương thích SDK 58 để quét QR. Điện thoại và laptop �
 
 Android emulator dùng `http://10.0.2.2:4000`; iOS simulator có thể dùng `http://localhost:4000`. `localhost` trên điện thoại thật trỏ về chính điện thoại. Không cần nhập API Key trong ứng dụng. Có thể đặt địa chỉ mặc định bằng `mobile/.env` theo `mobile/.env.example`; khởi động lại Metro sau khi thay đổi. Địa chỉ trong **Kết nối** được lưu trên máy và ưu tiên hơn mặc định này.
 
+Nếu Safari mở được `/api/health` nhưng Expo Go không kết nối: kiểm tra URL **đã lưu trong app**, không kèm `/api/health`, rồi vào iPhone **Cài đặt → Quyền riêng tư & Bảo mật → Mạng cục bộ → Expo Go** và bật quyền nếu đang tắt. Đóng/mở lại Expo Go rồi kiểm tra kết nối trong app. Safari được miễn kiểm tra quyền này, nên Safari truy cập được chưa chứng minh Expo Go có quyền. [Apple TN3179](https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy).
+
 **Xem thử khi chưa có khóa:** Trang chủ → **Khám phá báo cáo mẫu**. Cả báo cáo và câu trả lời đều gắn nhãn **DỮ LIỆU MẪU**, sử dụng hợp đồng giả định được đóng gói cùng app, không gọi OpenAI. Mẫu không phân tích ảnh người dùng và không thay thế kết quả thật khi có lỗi.
 
 ## Luồng sử dụng đầy đủ

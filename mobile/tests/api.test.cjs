@@ -197,6 +197,39 @@ test('a network failure gives connection guidance rather than raw fetch diagnost
   });
 });
 
+test('SDK 58 native FetchError is translated without depending on TypeError', async () => {
+  class FetchError extends Error {
+    constructor() { super('fetch failed: Could not connect to the server.'); this.name = 'FetchError'; }
+  }
+  const api = client(async () => { throw new FetchError(); });
+  await assert.rejects(api.health('http://192.168.173.234:4000'), (error) => {
+    assert.match(error.message, /Không kết nối được máy chủ http:\/\/192\.168\.173\.234:4000/);
+    assert.match(error.message, /Mạng cục bộ/);
+    assert.doesNotMatch(error.message, /fetch failed|Could not connect/);
+    return true;
+  });
+});
+
+test('loopback connection failures explain the laptop LAN address on a real phone', async () => {
+  const api = client(async () => { throw new Error('native network failure'); });
+  for (const url of ['http://localhost:4000', 'http://127.0.0.1:4000', 'http://[::1]:4000']) {
+    await assert.rejects(api.health(url), (error) => {
+      assert.match(error.message, /IP Wi-Fi của laptop thay cho localhost/);
+      return true;
+    });
+  }
+});
+
+test('transport rejection from another realm is localized without leaking native diagnostics', async () => {
+  const foreignError = vm.runInNewContext('new Error("fetch failed: native private diagnostics")');
+  const api = client(async () => { throw foreignError; });
+  await assert.rejects(api.health('http://192.168.173.234:4000'), (error) => {
+    assert.match(error.message, /Không kết nối được máy chủ/);
+    assert.doesNotMatch(error.message, /native private diagnostics/);
+    return true;
+  });
+});
+
 test('invalid server URLs fail before any network request', async () => {
   let requests = 0;
   const api = client(async () => { requests += 1; throw new Error('Unexpected network call'); });

@@ -9,12 +9,26 @@ export async function request<T>(baseUrl: string, path: string, body?: unknown, 
   options.signal?.addEventListener('abort', cancel);
   const timer = setTimeout(() => { timedOut = true; controller.abort(); }, options.timeout ?? 15000);
   try {
-    const response = await fetch(`${normalizeApiUrl(baseUrl)}${path}`, {
+    const serverUrl = normalizeApiUrl(baseUrl);
+    const requestOptions: RequestInit = {
       method: body === undefined ? 'GET' : 'POST',
       headers: { Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: controller.signal,
-    });
+    };
+    let response: Response;
+    try {
+      response = await fetch(`${serverUrl}${path}`, requestOptions);
+    } catch (error) {
+      // SDK 58's native FetchError extends Error, rather than TypeError. Only
+      // transport rejections belong here; HTTP/JSON/input errors stay separate.
+      if (controller.signal.aborted) throw error;
+      const hostname = new URL(serverUrl).hostname;
+      const loopback = hostname === 'localhost' || hostname === '[::1]' || /^127\./.test(hostname);
+      throw new Error(`Không kết nối được máy chủ ${serverUrl}. ${loopback
+        ? 'Trên điện thoại thật, vào Kết nối và nhập IP Wi-Fi của laptop thay cho localhost.'
+        : 'Kiểm tra địa chỉ trong Kết nối, Wi-Fi và backend trên laptop.'} Nếu dùng iPhone, kiểm tra quyền Mạng cục bộ của Expo Go hoặc RentGuard trong Cài đặt.`);
+    }
     const value: unknown = await response.json().catch(() => null);
     if (!response.ok) {
       const detail = value as ApiError | null;
@@ -24,7 +38,6 @@ export async function request<T>(baseUrl: string, path: string, body?: unknown, 
     return value as T;
   } catch (error) {
     if (controller.signal.aborted) throw new Error(timedOut ? 'Máy chủ phản hồi quá lâu. Kiểm tra kết nối và thử lại; yêu cầu trước có thể vẫn đang được xử lý.' : 'Đã hủy yêu cầu.');
-    if (error instanceof TypeError) throw new Error('Không kết nối được máy chủ. Kiểm tra Wi-Fi, địa chỉ máy chủ và backend trên laptop.');
     throw error;
   } finally {
     clearTimeout(timer);
