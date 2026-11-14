@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+artifacts/
+*.apk
+.env
+.env.*
+!.env.example
+**/.data/
+**/.expo/
+**/test-results/
+*.log
