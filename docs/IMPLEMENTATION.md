@@ -27,6 +27,6 @@ Kết quả kiểm tra thực tế được ghi tại `docs/TESTING.md` khi hoà
 
 ## Trạng thái triển khai 14/11/2026
 
-Các giai đoạn1–7 đã có mã nguồn và được nối thành luồng đầy đủ. Giai đoạn8:33 Mobile tests,21 Backend tests, TypeScript, lint, Expo Doctor20/20 và export Android/iOS/web đạt. Giai đoạn9: EAS đã liên kết tài khoản cá nhân được người dùng chọn, **build APK preview thành công**, tải artifact và kiểm tra tính toàn vẹn file. Xem TESTING để biết build và checksum.
+Các giai đoạn1–7 đã có mã nguồn và được nối thành luồng đầy đủ. Giai đoạn8 hiện có49 Mobile tests (gồm13 kiểm tra tương phản),21 Backend tests; TypeScript, lint, Expo Doctor20/20 và export Android/iOS/web đạt. Giai đoạn9: EAS đã liên kết tài khoản cá nhân được người dùng chọn, **build APK preview thành công**, tải artifact và kiểm tra tính toàn vẹn file. APK được tạo trước đợt tối ưu giao diện xanh dương; source/Expo Go hiện dùng giao diện mới. Xem TESTING để biết build và checksum, UI_UX để xem thay đổi trải nghiệm.
 
 Các tiêu chí nghiệm thu phụ thuộc bên ngoài chưa được coi là đạt: AI thật cần khóa OpenAI, còn camera, hiển thị và độ ổn định Android thật cần cài APK trên thiết bị. Không dùng kết quả mẫu hoặc test provider để thay các tiêu chí này.

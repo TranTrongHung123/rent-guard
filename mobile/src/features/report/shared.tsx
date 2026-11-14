@@ -30,37 +30,31 @@ export function openEvidence(reportId: string, evidence: Evidence) {
 export function EvidenceLink({ reportId, evidence, compact = false }: {
   reportId: string; evidence: Evidence; compact?: boolean;
 }) {
-  return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`Xem bằng chứng trang ${evidence.pageNumber}: ${evidence.quote}`}
-      onPress={() => openEvidence(reportId, evidence)}
-      style={({ pressed }) => [styles.evidence, compact && styles.compact, pressed && { opacity: 0.7 }]}>
-      <View style={styles.evidenceTitle}>
-        <Feather name="file-text" size={14} color={colors.low} />
-        <Text style={styles.evidenceLabel}>TRANG {evidence.pageNumber}</Text>
-        <Feather name="arrow-up-right" size={15} color={colors.low} />
-      </View>
-      <Text style={[textStyles.body, styles.quote]} numberOfLines={compact ? 3 : undefined}>“{evidence.quote}”</Text>
-      {!compact ? <Text style={textStyles.caption}>Nhấn để đối chiếu ảnh hợp đồng</Text> : null}
-    </Pressable>
-  );
+  return <Pressable accessibilityRole="button" accessibilityLabel={`Xem trích dẫn và ảnh gốc trang ${evidence.pageNumber}`}
+    onPress={() => openEvidence(reportId, evidence)}
+    style={({ pressed }) => [styles.evidence, compact && styles.compact, pressed && { opacity: 0.75 }]}>
+    <View style={styles.evidenceTitle}>
+      <View style={styles.pageTag}><Feather name="file-text" size={13} color={colors.primary} /><Text style={styles.evidenceLabel}>Trang {evidence.pageNumber}</Text></View>
+      <View style={styles.openLabel}><Text style={styles.openText}>Ảnh gốc</Text><Feather name="arrow-up-right" size={15} color={colors.primary} /></View>
+    </View>
+    <Text style={[textStyles.body, styles.quote]} numberOfLines={compact ? 2 : 4}>“{evidence.quote}”</Text>
+    {!compact ? <Text style={styles.hint}>Chạm để đọc đầy đủ và đối chiếu</Text> : null}
+  </Pressable>;
 }
 
 export function ReportUnavailable({ loading = false }: { loading?: boolean }) {
-  return (
-    <Screen>
-      <BackHeader title="Hợp đồng" />
-      {loading ? <View style={styles.loading}><ActivityIndicator color={colors.forest} /><Text style={textStyles.muted}>Đang mở hợp đồng…</Text></View>
-        : <EmptyState icon="file-minus" title="Không tìm thấy báo cáo" body="Báo cáo này chưa được lưu hoặc đã bị xóa. Bạn có thể mở lại một hợp đồng trong lịch sử."
-          action={<Button title="Mở lịch sử" icon="clock" onPress={() => router.replace('/history')} />} />}
-    </Screen>
-  );
+  return <Screen><BackHeader title="Hợp đồng" />
+    {loading ? <View style={styles.loading}><ActivityIndicator color={colors.primary} /><Text style={textStyles.muted}>Đang mở hợp đồng…</Text></View>
+      : <EmptyState icon="file-minus" title="Không tìm thấy báo cáo" body="Báo cáo này chưa được lưu hoặc đã bị xóa. Hãy mở một hợp đồng trong lịch sử."
+        action={<Button title="Mở lịch sử" icon="clock" onPress={() => router.replace('/history')} />} />}
+  </Screen>;
 }
 
 const styles = StyleSheet.create({
-  evidence: { backgroundColor: '#F3F6EF', borderRadius: 13, borderLeftWidth: 3, borderLeftColor: '#A8C294', padding: 14, gap: 9 },
-  compact: { padding: 12 },
-  evidenceTitle: { flexDirection: 'row', gap: 6, alignItems: 'center' },
-  evidenceLabel: { fontSize: 10, fontWeight: '700', color: colors.low, letterSpacing: 0.8 },
-  quote: { fontSize: 14, lineHeight: 22 },
+  evidence: { backgroundColor: colors.primarySoft, borderRadius: 14, borderWidth: 1, borderColor: colors.primaryBorder, padding: 14, gap: 10 },
+  compact: { padding: 12, gap: 8 }, evidenceTitle: { flexDirection: 'row', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
+  pageTag: { flexDirection: 'row', alignItems: 'center', gap: 5 }, evidenceLabel: { fontSize: 12, fontWeight: '700', color: colors.primaryDeep },
+  openLabel: { flexDirection: 'row', alignItems: 'center', gap: 3 }, openText: { fontSize: 11, color: colors.primaryDeep, fontWeight: '600' },
+  quote: { fontSize: 14, lineHeight: 22, color: colors.ink }, hint: { fontSize: 11, lineHeight: 17, color: colors.muted },
   loading: { alignItems: 'center', padding: 40, gap: 14 },
 });

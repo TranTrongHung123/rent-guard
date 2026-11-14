@@ -2,6 +2,8 @@
 
 Ứng dụng đọc hợp đồng thuê nhà bằng ảnh nhiều trang, báo cáo có bằng chứng và hỏi đáp nhiều lượt. Mobile tiếp tục từ **Expo SDK 58 + React Native + TypeScript + Expo Router** hiện có; Backend là **Node.js + Express**, gọi **OpenAI Vision + Structured Outputs** thật.
 
+Giao diện hiện dùng xanh dương làm màu chủ đạo, với nút phân tích/lưu/hỏi đáp cố định, báo cáo ưu tiên rõ ràng và lỗi không che điều hướng. Chi tiết thiết kế và phạm vi kiểm tra: [docs/UI_UX.md](docs/UI_UX.md). APK bên dưới được tạo trước lần cập nhật giao diện này; Expo Go tải source mới khi reload project.
+
 **APK Android đã build thành công:** [Tải RentGuard](https://expo.dev/artifacts/eas/7pSWZBMVKaWP42iSv1P6KJ8hdpGl5EQENy6hxV4ko4c.apk). Bản tải trong workspace: `artifacts/RentGuard-preview.apk` (102.689.192 bytes). [Thông tin build](https://expo.dev/accounts/trantronghung/projects/rentguard/builds/42b6af69-42fb-40c5-9092-878d740cf7ff). Cài xong, mở **Kết nối** để đặt địa chỉ Backend trên laptop.
 
 ## Chạy Backend

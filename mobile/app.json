@@ -22,7 +22,7 @@
       "package": "vn.rentguard.app",
       "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#173E35",
+        "backgroundColor": "#2563EB",
         "foregroundImage": "./assets/images/rentguard-icon.png"
       },
       "predictiveBackGestureEnabled": true,
@@ -39,9 +39,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#173E35",
+          "backgroundColor": "#F4F7FC",
           "image": "./assets/images/rentguard-icon.png",
-          "imageWidth": 180
+          "imageWidth": 120
         }
       ],
       [

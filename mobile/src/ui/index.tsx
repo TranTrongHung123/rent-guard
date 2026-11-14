@@ -1,82 +1,97 @@
 import Feather from '@expo/vector-icons/Feather';
 import { router } from 'expo-router';
-import type { ComponentProps, ReactNode } from 'react';
+import type { ComponentProps, ComponentRef, ReactNode, Ref } from 'react';
 import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  type StyleProp,
-  type ViewStyle,
+  ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View,
+  type StyleProp, type ViewStyle,
 } from 'react-native';
 
-export const colors = {
-  background: '#F6F7F2', surface: '#FFFFFF', ink: '#182E28', muted: '#68766F',
-  forest: '#173E35', mint: '#D8EFBE', line: '#E2E7DD', high: '#B24732',
-  medium: '#A66A19', low: '#3C7863', cream: '#F0F2E9',
-};
+import { colors } from './palette';
+export { colors } from './palette';
 
 export type IconName = ComponentProps<typeof Feather>['name'];
 
-export function Screen({ children, scroll = true, style }: {
+export function Screen({ children, scroll = true, style, footer, contentContainerStyle, scrollRef }: {
   children: ReactNode; scroll?: boolean; style?: StyleProp<ViewStyle>;
+  footer?: ReactNode; contentContainerStyle?: StyleProp<ViewStyle>; scrollRef?: Ref<ComponentRef<typeof ScrollView>>;
 }) {
-  if (!scroll) return <View style={[styles.screen, styles.content, style]}>{children}</View>;
-  return (
-    <ScrollView style={styles.screen} contentContainerStyle={[styles.content, style]}
-      keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+  return <View style={styles.screen}>
+    {scroll ? <ScrollView ref={scrollRef} style={styles.screen}
+      contentContainerStyle={[styles.content, footer ? { paddingBottom: 20 } : undefined, style, contentContainerStyle]}
+      keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false}>
       {children}
-    </ScrollView>
-  );
+    </ScrollView> : <View style={[styles.screen, styles.content, style, contentContainerStyle]}>{children}</View>}
+    {footer ? <View style={styles.footer}><View style={styles.footerContent}>{footer}</View></View> : null}
+  </View>;
 }
 
 export function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
   return <View style={[styles.card, style]}>{children}</View>;
 }
 
-export function Button({ title, onPress, variant = 'primary', loading = false, disabled = false, icon, style }: {
+export function Button({ title, onPress, variant = 'primary', loading = false, disabled = false, icon, style, compact = false }: {
   title: string; onPress: () => void; variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
-  loading?: boolean; disabled?: boolean; icon?: IconName; style?: StyleProp<ViewStyle>;
+  loading?: boolean; disabled?: boolean; icon?: IconName; style?: StyleProp<ViewStyle>; compact?: boolean;
 }) {
-  const foreground = variant === 'primary' ? '#FFFFFF' : variant === 'danger' ? colors.high : colors.forest;
-  return (
-    <Pressable accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ disabled: disabled || loading, busy: loading }}
-      disabled={disabled || loading} onPress={onPress}
-      style={({ pressed }) => [styles.button, styles[variant], (disabled || loading) && styles.disabled, pressed && styles.pressed, style]}>
-      {loading ? <ActivityIndicator size="small" color={foreground} /> : icon ? <Feather name={icon} size={18} color={foreground} /> : null}
-      <Text style={[styles.buttonText, { color: foreground }]}>{title}</Text>
-    </Pressable>
-  );
+  const foreground = variant === 'primary' ? colors.onPrimary : variant === 'danger' ? colors.high : colors.primaryDeep;
+  return <Pressable accessibilityRole="button" accessibilityLabel={title}
+    accessibilityState={{ disabled: disabled || loading, busy: loading }} disabled={disabled || loading} onPress={onPress}
+    style={({ pressed }) => [styles.button, compact && styles.buttonCompact, styles[variant], (disabled || loading) && styles.disabled, pressed && styles.pressed, style]}>
+    {loading ? <ActivityIndicator size="small" color={foreground} /> : icon ? <Feather name={icon} size={18} color={foreground} /> : null}
+    <Text style={[styles.buttonText, { color: foreground }]}>{title}</Text>
+  </Pressable>;
 }
 
-export function IconButton({ icon, label, onPress, disabled = false, color = colors.forest }: {
+export function IconButton({ icon, label, onPress, disabled = false, color = colors.primary }: {
   icon: IconName; label: string; onPress: () => void; disabled?: boolean; color?: string;
 }) {
-  return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled} onPress={onPress}
-      hitSlop={4} style={({ pressed }) => [styles.iconButton, disabled && styles.disabled, pressed && styles.pressed]}>
-      <Feather name={icon} size={20} color={color} />
-    </Pressable>
-  );
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled }}
+    disabled={disabled} onPress={onPress} hitSlop={4}
+    style={({ pressed }) => [styles.iconButton, disabled && styles.disabled, pressed && styles.pressed]}>
+    <Feather name={icon} size={20} color={color} />
+  </Pressable>;
 }
 
 const badgePalette = {
-  high: { backgroundColor: '#FBEAE4', color: colors.high },
-  medium: { backgroundColor: '#FFF1D9', color: colors.medium },
-  low: { backgroundColor: '#E4F1EB', color: colors.low },
-  neutral: { backgroundColor: '#EEF1EB', color: colors.muted },
-  mint: { backgroundColor: colors.mint, color: colors.forest },
+  high: { backgroundColor: colors.highSoft, color: colors.high },
+  medium: { backgroundColor: colors.mediumSoft, color: colors.medium },
+  low: { backgroundColor: colors.lowSoft, color: colors.low },
+  neutral: { backgroundColor: colors.surfaceAlt, color: colors.muted },
+  primary: { backgroundColor: colors.primarySoft, color: colors.primaryDeep },
 };
 
 export function Badge({ children, tone = 'neutral' }: { children: ReactNode; tone?: keyof typeof badgePalette }) {
   const palette = badgePalette[tone];
-  return <View style={[styles.badge, { backgroundColor: palette.backgroundColor }]}><Text style={[styles.badgeText, { color: palette.color }]}>{children}</Text></View>;
+  return <View style={[styles.badge, { backgroundColor: palette.backgroundColor }]}>
+    <Text style={[styles.badgeText, { color: palette.color }]}>{children}</Text>
+  </View>;
 }
 
 export function SourceBadge({ source }: { source: 'openai' | 'demo' }) {
-  return <Badge tone={source === 'demo' ? 'medium' : 'mint'}>{source === 'demo' ? 'DỮ LIỆU MẪU' : 'PHÂN TÍCH OPENAI'}</Badge>;
+  return <Badge tone={source === 'demo' ? 'medium' : 'primary'}>{source === 'demo' ? 'Dữ liệu mẫu' : 'Phân tích OpenAI'}</Badge>;
+}
+
+const noticePalette = {
+  info: { background: colors.primarySoft, foreground: colors.primaryDeep, border: colors.primaryBorder, icon: 'info' as const },
+  error: { background: colors.highSoft, foreground: colors.high, border: colors.highBorder, icon: 'alert-circle' as const },
+  success: { background: colors.lowSoft, foreground: colors.low, border: colors.line, icon: 'check-circle' as const },
+  warning: { background: colors.mediumSoft, foreground: colors.medium, border: colors.mediumBorder, icon: 'alert-triangle' as const },
+};
+
+export function Notice({ tone = 'info', title, children, action }: {
+  tone?: keyof typeof noticePalette; title?: string; children: ReactNode; action?: ReactNode;
+}) {
+  const palette = noticePalette[tone];
+  return <View style={[styles.notice, { backgroundColor: palette.background, borderColor: palette.border }]}
+    accessibilityRole={tone === 'error' ? 'alert' : undefined} accessibilityLiveRegion={tone === 'error' ? 'polite' : undefined}>
+    <Feather name={palette.icon} color={palette.foreground} size={19} style={{ marginTop: 2 }} />
+    <View style={styles.noticeBody}>
+      {title ? <Text style={[styles.noticeTitle, { color: palette.foreground }]}>{title}</Text> : null}
+      {typeof children === 'string' || typeof children === 'number'
+        ? <Text style={[styles.noticeText, { color: palette.foreground }]}>{children}</Text> : children}
+      {action}
+    </View>
+  </View>;
 }
 
 export function Heading({ title, subtitle, kicker }: { title: string; subtitle?: string; kicker?: string }) {
@@ -90,7 +105,7 @@ export function Heading({ title, subtitle, kicker }: { title: string; subtitle?:
 export function BackHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return <View style={styles.backHeader}>
     <IconButton icon="arrow-left" label="Quay lại" onPress={() => router.canGoBack() ? router.back() : router.replace('/')} />
-    <View style={{ flex: 1, gap: 3 }}><Text accessibilityRole="header" style={styles.headerTitle}>{title}</Text>
+    <View style={{ flex: 1, minWidth: 0, gap: 4 }}><Text accessibilityRole="header" style={styles.headerTitle}>{title}</Text>
       {subtitle ? <Text style={styles.caption}>{subtitle}</Text> : null}</View>
   </View>;
 }
@@ -99,7 +114,7 @@ export function EmptyState({ icon = 'file-text', title, body, action }: {
   icon?: IconName; title: string; body: string; action?: ReactNode;
 }) {
   return <Card style={styles.empty}>
-    <View style={styles.emptyIcon}><Feather name={icon} size={30} color={colors.forest} /></View>
+    <View style={styles.emptyIcon}><Feather name={icon} size={29} color={colors.primary} /></View>
     <Text style={styles.emptyTitle}>{title}</Text>
     <Text style={styles.emptyBody}>{body}</Text>
     {action}
@@ -107,34 +122,42 @@ export function EmptyState({ icon = 'file-text', title, body, action }: {
 }
 
 export const textStyles = StyleSheet.create({
-  title: { fontSize: 27, fontWeight: '700', color: colors.ink, letterSpacing: -0.7 },
-  section: { fontSize: 20, fontWeight: '700', color: colors.ink, letterSpacing: -0.3 },
+  title: { fontSize: 28, lineHeight: 36, fontWeight: '700', color: colors.ink, letterSpacing: -0.7 },
+  section: { fontSize: 19, lineHeight: 27, fontWeight: '700', color: colors.ink, letterSpacing: -0.3 },
   body: { fontSize: 15, color: colors.ink, lineHeight: 23 },
-  muted: { fontSize: 14, color: colors.muted, lineHeight: 21 },
+  muted: { fontSize: 14, color: colors.muted, lineHeight: 22 },
   caption: { fontSize: 12, color: colors.muted, lineHeight: 18 },
-  label: { fontSize: 13, fontWeight: '600', color: colors.ink },
+  label: { fontSize: 13, lineHeight: 20, fontWeight: '600', color: colors.ink },
 });
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 22, paddingBottom: 32, gap: 22, width: '100%', maxWidth: 760, alignSelf: 'center' },
-  card: { backgroundColor: colors.surface, borderRadius: 22, padding: 20, borderWidth: 1, borderColor: colors.line, gap: 12 },
-  button: { minHeight: 52, borderRadius: 15, paddingHorizontal: 18, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
+  content: { padding: 20, paddingBottom: 32, gap: 20, width: '100%', maxWidth: 760, alignSelf: 'center' },
+  footer: { backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.line },
+  footerContent: { width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: 20, paddingVertical: 14, gap: 10 },
+  card: { backgroundColor: colors.surface, borderRadius: 20, padding: 18, borderWidth: 1, borderColor: colors.line, gap: 12 },
+  button: { minHeight: 52, borderRadius: 14, paddingHorizontal: 18, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
+  buttonCompact: { minHeight: 46, paddingHorizontal: 14, paddingVertical: 10 },
   buttonText: { fontSize: 15, fontWeight: '700', flexShrink: 1, textAlign: 'center', lineHeight: 21 },
-  primary: { backgroundColor: colors.forest }, secondary: { backgroundColor: colors.mint },
-  ghost: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.line },
-  danger: { backgroundColor: '#FBEAE4' },
-  disabled: { opacity: 0.45 }, pressed: { opacity: 0.75, transform: [{ scale: 0.99 }] },
-  iconButton: { minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: colors.cream },
-  badge: { borderRadius: 7, paddingHorizontal: 9, paddingVertical: 5, alignSelf: 'flex-start' },
-  badgeText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.55 },
-  heading: { gap: 9 }, kicker: { fontSize: 11, fontWeight: '700', letterSpacing: 2, color: colors.low },
-  title: { fontSize: 31, lineHeight: 39, letterSpacing: -0.9, color: colors.ink, fontWeight: '700' },
-  subtitle: { fontSize: 15, lineHeight: 23, color: colors.muted },
-  backHeader: { flexDirection: 'row', alignItems: 'center', gap: 13 },
-  headerTitle: { fontSize: 19, fontWeight: '700', color: colors.ink }, caption: { fontSize: 12, color: colors.muted },
-  empty: { alignItems: 'center', paddingVertical: 32, gap: 14 },
-  emptyIcon: { width: 66, height: 66, borderRadius: 22, backgroundColor: colors.mint, justifyContent: 'center', alignItems: 'center' },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.ink, textAlign: 'center' },
-  emptyBody: { fontSize: 14, color: colors.muted, lineHeight: 22, textAlign: 'center', maxWidth: 340 },
+  primary: { backgroundColor: colors.primary },
+  secondary: { backgroundColor: colors.primarySoft, borderWidth: 1, borderColor: colors.primaryBorder },
+  ghost: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line },
+  danger: { backgroundColor: colors.highSoft, borderWidth: 1, borderColor: colors.highBorder },
+  disabled: { opacity: 0.45 }, pressed: { opacity: 0.78 },
+  iconButton: { minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 13, backgroundColor: colors.surfaceAlt },
+  badge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start', flexShrink: 1 },
+  badgeText: { fontSize: 11, lineHeight: 16, fontWeight: '700', letterSpacing: 0.15 },
+  heading: { gap: 8 }, kicker: { fontSize: 12, lineHeight: 18, fontWeight: '600', letterSpacing: 0.4, color: colors.primary },
+  title: { fontSize: 29, lineHeight: 37, letterSpacing: -0.8, color: colors.ink, fontWeight: '700' },
+  subtitle: { fontSize: 14, lineHeight: 22, color: colors.muted },
+  backHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  headerTitle: { fontSize: 20, lineHeight: 27, fontWeight: '700', color: colors.ink },
+  caption: { fontSize: 12, lineHeight: 18, color: colors.muted },
+  empty: { alignItems: 'center', paddingVertical: 30, gap: 13 },
+  emptyIcon: { width: 64, height: 64, borderRadius: 22, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
+  emptyTitle: { fontSize: 19, lineHeight: 26, fontWeight: '700', color: colors.ink, textAlign: 'center' },
+  emptyBody: { fontSize: 14, color: colors.muted, lineHeight: 22, textAlign: 'center', maxWidth: 350 },
+  notice: { borderWidth: 1, borderRadius: 16, padding: 14, flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
+  noticeBody: { flex: 1, minWidth: 0, gap: 5 }, noticeTitle: { fontSize: 14, lineHeight: 21, fontWeight: '700' },
+  noticeText: { fontSize: 13, lineHeight: 21 },
 });

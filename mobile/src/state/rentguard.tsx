@@ -103,6 +103,7 @@ export function RentGuardProvider({ children }: PropsWithChildren) {
   }
 
   async function checkBackend() {
+    setError(null);
     try {
       const value = await health(apiUrl);
       if (value.status !== 'ok' || typeof value.aiConfigured !== 'boolean') throw new Error('Máy chủ này không phải backend RentGuard tương thích.');
