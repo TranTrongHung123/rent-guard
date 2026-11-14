@@ -39,7 +39,8 @@ export class OpenAIService implements StructuredAI {
         // Retry only an explicit unsupported sampling parameter, not unrelated
         // input/auth/quota/network errors. Reasoning models may omit temperature.
         if (error instanceof OpenAI.APIError && error.status === 400 && error.param === 'temperature' &&
-          (error.code === 'unsupported_parameter' || error.code === 'unsupported_value')) {
+          (error.code === 'unsupported_parameter' || error.code === 'unsupported_value' ||
+            (error.code == null && /unsupported (?:parameter|value):\s*['"]?temperature\b/i.test(error.message)))) {
           this.temperatureSupported = false;
           result = await this.client.responses.parse(body, { signal });
         } else throw error;

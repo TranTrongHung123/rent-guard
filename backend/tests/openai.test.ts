@@ -5,11 +5,11 @@ import { OpenAIService } from '../src/ai.js';
 import { AppError } from '../src/errors.js';
 import { config, page, png } from './helpers.js';
 
-function sdkWithResponse(output: unknown, options: { status?: string; refusal?: boolean; httpStatus?: number; rejectTemperature?: boolean; errorParam?: string; errorCode?: string } = {}) {
+function sdkWithResponse(output: unknown, options: { status?: string; refusal?: boolean; httpStatus?: number; rejectTemperature?: boolean; errorParam?: string; errorCode?: string | null; errorMessage?: string } = {}) {
   const requests: Record<string, unknown>[] = [];
   const client = new OpenAI({ apiKey: 'test-placeholder-no-external-request', maxRetries: 0, fetch: async (_url, init) => {
     requests.push(JSON.parse(init?.body as string));
-    if (options.httpStatus || (options.rejectTemperature && 'temperature' in requests.at(-1)!)) return new Response(JSON.stringify({ error: { message: 'Test provider error', type: 'test_error', param: options.errorParam ?? 'temperature', code: options.errorCode ?? 'unsupported_parameter' } }), { status: options.httpStatus ?? 400, headers: { 'Content-Type': 'application/json' } });
+    if (options.httpStatus || (options.rejectTemperature && 'temperature' in requests.at(-1)!)) return new Response(JSON.stringify({ error: { message: options.errorMessage ?? 'Test provider error', type: 'invalid_request_error', param: options.errorParam ?? 'temperature', code: options.errorCode === undefined ? 'unsupported_parameter' : options.errorCode } }), { status: options.httpStatus ?? 400, headers: { 'Content-Type': 'application/json' } });
     return new Response(JSON.stringify({
       id: 'resp_test', object: 'response', created_at: 1, status: options.status || 'completed', model: config.model,
       output: [{ id: 'msg_test', type: 'message', role: 'assistant', status: 'completed', content: [options.refusal ? { type: 'refusal', refusal: 'Test refusal' } : { type: 'output_text', text: JSON.stringify(output), annotations: [] }] }],
@@ -46,11 +46,19 @@ test('only explicit unsupported temperature errors fall back, then the model cap
     assert.equal('temperature' in requests[2]!, false);
     assert.equal(requests[1]!.store, false);
   }
-  for (const options of [{ httpStatus: 400, errorParam: 'input', errorCode: 'unsupported_value' }, { httpStatus: 400, errorParam: 'temperature', errorCode: 'other_error' }, { httpStatus: 401 }, { httpStatus: 429 }]) {
+  for (const options of [{ httpStatus: 400, errorParam: 'input', errorCode: 'unsupported_value' }, { httpStatus: 400, errorParam: 'temperature', errorCode: 'other_error' }, { httpStatus: 400, errorCode: null, errorMessage: 'Temperature must be a valid number.' }, { httpStatus: 400, errorParam: 'input', errorCode: null, errorMessage: "Unsupported parameter: 'temperature' is not supported with this model." }, { httpStatus: 401 }, { httpStatus: 429 }]) {
     const { ai, requests } = sdkWithResponse({}, options);
     await assert.rejects(ai.extract({ id: 'page-1', dataUrl: png }, 1), AppError);
     assert.equal(requests.length, 1);
   }
+});
+test('observed null-code unsupported temperature error retries safely without changing model', async () => {
+  const { ai, requests } = sdkWithResponse({ status: 'readable', text: page.text, warning: null }, { rejectTemperature: true, errorCode: null, errorMessage: "Unsupported parameter: 'temperature' is not supported with this model." });
+  const output = await ai.extract({ id: 'page-1', dataUrl: png }, 1);
+  assert.equal(output.text, page.text);
+  assert.equal(requests.length, 2);
+  assert.equal(requests[1]!.model, config.model);
+  assert.equal('temperature' in requests[1]!, false);
 });
 test('SDK refusal, incomplete output and authentication/quota errors are explicit', async () => {
   const cases = [

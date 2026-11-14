@@ -5,8 +5,8 @@ import { CONTRACT_CHECKS, CONTRACT_RULES, SAFETY_INSTRUCTIONS, SEVERITY_RUBRIC }
 import { AppError } from './errors.js';
 
 /** Bump whenever prompts, schemas or analysis semantics change. */
-export const ANALYSIS_VERSION = 'rentguard-v2.0.0';
-export const SAMPLING_POLICY = 'temperature-zero-if-supported-v1';
+export const ANALYSIS_VERSION = 'rentguard-v2.0.1';
+export const SAMPLING_POLICY = 'temperature-zero-if-supported-v2';
 export const sha256 = (value: string) => createHash('sha256').update(value, 'utf8').digest('hex');
 export function analysisPolicyId(config: Config): string {
   return createHmac('sha256', config.signingSecret).update(JSON.stringify({ version: ANALYSIS_VERSION, model: config.model, checks: CONTRACT_CHECKS, rules: CONTRACT_RULES, safety: SAFETY_INSTRUCTIONS, rubric: SEVERITY_RUBRIC, sampling: SAMPLING_POLICY })).digest('hex');
