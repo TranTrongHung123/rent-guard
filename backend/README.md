@@ -62,7 +62,7 @@ Kiểm chứng giảm rủi ro, không chứng minh OCR đúng với ảnh hoặ
 
 ## Ổn định kết quả và phân tích lại
 
-`src/stability.ts` tạo SHA-256 cho bộ ảnh theo thứ tự (không gồm ID picker), chuẩn hóa ID trước khi gọi AI và quản lý cache RAM có TTL/LRU. Hai cache ảnh/văn bản có giới hạn riêng 32 báo cáo và 8 MiB, tổng tối đa 16 MiB nội dung JSON. Không lưu hợp đồng lên đĩa. Khóa chính sách phụ thuộc phiên bản `rentguard-v2.0.0`, model, quy tắc và secret; sửa prompt/schema phải tăng `ANALYSIS_VERSION`.
+`src/stability.ts` tạo SHA-256 cho bộ ảnh theo thứ tự (không gồm ID picker), chuẩn hóa ID trước khi gọi AI và quản lý cache RAM có TTL/LRU. Hai cache ảnh/văn bản có giới hạn riêng 32 báo cáo và 8 MiB, tổng tối đa 16 MiB nội dung JSON. Không lưu hợp đồng lên đĩa. Khóa chính sách phụ thuộc phiên bản `rentguard-v2.0.1`, model, quy tắc và secret; sửa prompt/schema phải tăng `ANALYSIS_VERSION`.
 
 - AI phải xác nhận đã rà soát đủ 16 mã trong `reviewedChecks`, không thiếu/lặp; code gán mức ưu tiên theo `checkId`, loại trùng theo mã/vị trí và sắp thứ tự cố định. Mỗi mã có thể có nhiều phát hiện ở các điều khoản khác nhau.
 - Ảnh trùng byte, đúng thứ tự: dùng lại báo cáo đã kiểm chứng, không OCR/phân tích lại.
@@ -71,7 +71,7 @@ Kiểm chứng giảm rủi ro, không chứng minh OCR đúng với ảnh hoặ
 - `forceRefresh:true` luôn đọc/phân tích lại. Mobile có nút **Đọc lại từ ảnh**, giữ nguyên bản cũ và tạo báo cáo riêng. `report.analysis` ghi phiên bản, fingerprint, ngày phân tích gốc và `reuse: none/images/text/saved`; các trường này cũng được ký.
 - Các yêu cầu đồng thời cùng đầu vào chia sẻ một công việc. Một người hủy không hủy người còn chờ; tất cả hủy thì dừng OpenAI, không cache lỗi/kết quả bị hủy.
 
-Sampling dùng `temperature:0` khi model hỗ trợ; chỉ bỏ tham số và thử lại nếu provider trả 400 nêu rõ `temperature` với `unsupported_parameter/unsupported_value`. Không thử lại kiểu này với lỗi quyền, quota hay đầu vào khác. Temperature thấp không bảo đảm AI tất định. Ảnh mới có OCR khác, cache hết hạn mà không có báo cáo ký phù hợp, model/quy tắc đổi hoặc chủ động đọc lại vẫn có thể cho danh sách khác. Để kiểm tra phiên bản mới, phân tích mới một lần; báo cáo cũ giữ nguyên và vẫn mở được.
+Sampling dùng `temperature:0` khi model hỗ trợ; chỉ bỏ tham số và thử lại nếu provider trả 400 nêu rõ `param=temperature` với `unsupported_parameter/unsupported_value`, hoặc code rỗng kèm thông báo rõ `Unsupported parameter/value: temperature`. Trường hợp code rỗng đã được xác nhận bằng API thật. Không thử lại kiểu này với lỗi quyền, quota hay đầu vào khác. Temperature thấp không bảo đảm AI tất định. Ảnh mới có OCR khác, cache hết hạn mà không có báo cáo ký phù hợp, model/quy tắc đổi hoặc chủ động đọc lại vẫn có thể cho danh sách khác. Để kiểm tra phiên bản mới, phân tích mới một lần; báo cáo cũ giữ nguyên và vẫn mở được.
 
 ## Kiểm thử
 

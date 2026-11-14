@@ -63,7 +63,7 @@ npx eas-cli@latest build --platform android --profile preview
 
 EAS quản lý keystore Android; không đưa keystore/mật khẩu vào Git. Tải APK từ build thành công, mở trên Android và cho phép cài từ nguồn tải đó nếu điện thoại yêu cầu. Mở app → **Kết nối** → đặt IP LAN của laptop. Không cần build lại APK khi đổi IP hoặc API Key ở Backend. Tài liệu chính thức: [Build APK bằng Expo](https://docs.expo.dev/build-reference/apk/).
 
-Kết quả build và phạm vi kiểm thử thực tế xem [docs/TESTING.md](docs/TESTING.md).
+Bản mới nhất: **[Tải APK RentGuard 1.0.1](https://expo.dev/artifacts/eas/_BT4ZClvZnWAUg6tWH7SSB2IArtGvlRrVqbHy454mHo.apk)** (versionCode2), gồm giao diện xanh dương và luồng phân tích mới. File local: `artifacts/RentGuard-1.0.1.apk`. [Hướng dẫn cài và kết nối Backend](docs/APK_INSTALL.md); [build, checksum và phạm vi kiểm thử](docs/TESTING.md#apk). Đã kiểm tra chữ ký APK và OpenAI thật trên mẫu; chưa cài/chạy trên điện thoại Android thật trong phiên này.
 
 ## Source và kiểm tra
 

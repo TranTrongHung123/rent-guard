@@ -53,7 +53,7 @@ Mobile gửi tùy chọn `previousAnalysis:{report,analysisToken}` để khôi p
 
 `SingleFlight` gộp công việc đồng thời theo ảnh/text, tách luồng đọc lại chủ động. Hủy một subscriber không hủy các subscriber khác; khi hết người chờ, abort truyền tới OpenAI và không ghi cache. Lỗi/schema thiếu không được cache.
 
-Mọi bước dùng `temperature:0` khi được hỗ trợ. Chỉ fallback bỏ tham số khi HTTP400 chỉ rõ `param=temperature` và code `unsupported_parameter/unsupported_value`; ghi nhớ khả năng trong phiên Backend. Điều này giảm biến động sampling, **không bảo đảm tất định**. AI vẫn có thể chọn mã/bằng chứng khác hoặc kiểm chứng khác; OCR ảnh mới cũng có thể khác. Không hứa cùng hợp đồng vật lý luôn cho số phát hiện giống nhau. Cache bảo toàn một kết quả đã kiểm chứng, không chứng minh kết quả đó đầy đủ hoặc đúng với ảnh.
+Mọi bước dùng `temperature:0` khi được hỗ trợ. Chỉ fallback bỏ tham số khi HTTP400 chỉ rõ `param=temperature` và code `unsupported_parameter/unsupported_value`, hoặc code rỗng kèm thông báo rõ `Unsupported parameter/value: temperature`; ghi nhớ khả năng trong phiên Backend. Trường hợp code rỗng đã được xác nhận bằng API thật và bổ sung regression test trong pipeline `rentguard-v2.0.1`. Điều này giảm biến động sampling, **không bảo đảm tất định**. AI vẫn có thể chọn mã/bằng chứng khác hoặc kiểm chứng khác; OCR ảnh mới cũng có thể khác. Không hứa cùng hợp đồng vật lý luôn cho số phát hiện giống nhau. Cache bảo toàn một kết quả đã kiểm chứng, không chứng minh kết quả đó đầy đủ hoặc đúng với ảnh.
 
 ## JSON cuối cùng và nguồn kết quả
 

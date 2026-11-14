@@ -13,7 +13,7 @@ Ngày kiểm tra: **14/11/2026** (Asia/Saigon). Môi trường: Windows, Node.js
 | `npx expo-doctor` | **20/20 đạt**, dependencies/config tương thích SDK58 |
 | `npx expo export --platform all` | Đạt, Hermes bundle Android/iOS và static web với đầy đủ9 routes |
 | Backend `npm run typecheck` | Đạt |
-| Backend `npm test` | **34/34 đạt**, không gọi OpenAI thật; gồm cache, checklist, mức cố định, chữ ký, sampling fallback và hủy đồng thời |
+| Backend `npm test` | **35/35 đạt**, không gọi OpenAI thật; gồm cache, checklist, mức cố định, chữ ký, sampling fallback (kể cả code rỗng) và hủy đồng thời |
 | Backend `npm run build` | Đạt, tạo Node output chạy được |
 | Backend chạy thực tế | Bản build v2 khởi động cổng loopback tạm và health200, `aiConfigured:true`, model cục bộ được giữ nguyên; không gọi OpenAI. Server kiểm thử đã đóng |
 | Dependency tree | Không lỗi missing/invalid trong `npm ls`; Expo SDK không bị nâng/hạ |
@@ -38,9 +38,9 @@ Sau pipeline v2, đã chạy lại lint, TypeScript, shared types, Expo Doctor20
 
 Cập nhật từ thử nghiệm iPhone ngày14/11/2026: ảnh người dùng cung cấp cho thấy Safari nhận health200 và app hiển thị2 trang đã chọn, nhưng phân tích báo lỗi kết nối. Kiểm tra lại từ laptop cũng nhận200 qua loopback và IP LAN. Chưa xác nhận URL đã lưu/quyền mạng của Expo Go hoặc một lần phân tích thành công trên điện thoại. `aiConfigured:true` vẫn chỉ là có cấu hình khóa.
 
-Đã tái hiện lỗi wrapper để lọt `FetchError extends Error` của SDK58 (chỉ bắt TypeError trước đây), sửa để bắt lỗi tại chính fetch, thông báo URL đang gọi và hướng dẫn LAN/quyền iPhone.36 tests đạt, gồm native FetchError, localhost/IPv6 loopback và lỗi khác realm; HTTP, JSON, timeout và hủy vẫn tách biệt. Chưa đổi fetch stack, cấu hình khóa hay model. Sửa thông báo không tự cấp quyền hoặc thay URL đã lưu. Bản APK ở cuối tài liệu được tạo trước sửa JavaScript này; Expo Go dùng source hiện tại sau khi reload.
+Đã tái hiện lỗi wrapper để lọt `FetchError extends Error` của SDK58 (chỉ bắt TypeError trước đây), sửa để bắt lỗi tại chính fetch, thông báo URL đang gọi và hướng dẫn LAN/quyền iPhone. Các regression tests gồm native FetchError, localhost/IPv6 loopback và lỗi khác realm; HTTP, JSON, timeout và hủy vẫn tách biệt. Chưa đổi fetch stack, cấu hình khóa hay model. Sửa thông báo không tự cấp quyền hoặc thay URL đã lưu. APK1.0.1 ở cuối tài liệu đã chứa sửa này; APK1.0.0 cũ chưa có.
 
-- **OpenAI thật:** đã có cấu hình khóa cục bộ; chưa chạy kiểm thử hợp đồng thật trong đợt tối ưu này. Chưa đo độ chính xác OCR, độ lặp lại, độ trễ/chi phí hoặc hỏi đáp thực tế. Không coi test fixture hay `aiConfigured:true` là bằng chứng kết nối thực.
+- **OpenAI thật:** đã chạy luồng thật trên hai trang hợp đồng mẫu của dự án, model cục bộ `gpt-6.1-terra`, pipeline `rentguard-v2.0.1`: 3 phát hiện; câu trả lời đầu có 2 bằng chứng, lượt tiếp có 3 bằng chứng; gửi lại đúng ảnh giữ nguyên ID/mức phát hiện qua cache. Đã sửa lỗi thực tế HTTP400 `param=temperature`, `code=null`; không đổi khóa/model. Metadata: `artifacts/live-openai-verification-1.0.1.json`. Đây là kiểm thử kết nối và luồng trên mẫu, chưa phải benchmark độ chính xác, ảnh chụp lại, hợp đồng riêng hoặc chạy trên điện thoại.
 - **Android/iOS thật:** chưa có thiết bị/emulator/ADB kết nối trong phiên này. Chưa xác nhận quyền camera/thư viện, keyboard, notch, phóng to, khởi động lại app, cập nhật iOS container hoặc độ ổn định bộ nhớ trên thiết bị thật.
 - **Visual browser:** môi trường Computer Use không cung cấp browser/app để thao tác. Metro/web export thành công không thay thế kiểm tra giao diện trực quan.
 - **Tính đúng nghiệp vụ/pháp lý:** kiểm chứng trích dẫn không chứng minh OCR đọc đúng ảnh hoặc model không bỏ sót/không suy luận sai. Chưa có thẩm định pháp lý hay bộ benchmark tài liệu thực.
@@ -60,14 +60,16 @@ Kiểm thử kết nối opt-in (có phí) ở Backend: `npm run test:live -- <�
 
 ## APK
 
-Build Android cloud: [42b6af69-42fb-40c5-9092-878d740cf7ff](https://expo.dev/accounts/trantronghung/projects/rentguard/builds/42b6af69-42fb-40c5-9092-878d740cf7ff), **FINISHED** lúc **13:25:57 ngày14/11/2026** (Asia/Saigon). Gradle `BUILD SUCCESSFUL`, `assembleRelease` và upload artifact hoàn tất.
+Build mới nhất: [97dd3c59-eb8c-4a33-8e56-9f39f745f911](https://expo.dev/accounts/trantronghung/projects/rentguard/builds/97dd3c59-eb8c-4a33-8e56-9f39f745f911), **FINISHED** lúc **15:58:19 ngày14/11/2026** (Asia/Saigon).
 
-- [Tải APK](https://expo.dev/artifacts/eas/7pSWZBMVKaWP42iSv1P6KJ8hdpGl5EQENy6hxV4ko4c.apk); bản local: `artifacts/RentGuard-preview.apk`.
-- APK này được tạo trước giao diện xanh dương và pipeline ổn định v2. Expo Go dùng source mới sau reload; muốn cập nhật APK cần build lại profile preview.
-- Android package `vn.rentguard.app`, version1.0.0, versionCode1, SDK58, profile preview, distribution internal.
-- Dung lượng: **102.689.192 bytes**, khoảng97,93 MiB.
-- SHA-256: `a44e1f786c073c5cd4dd2bf4b074530c9be35861a955b4a8243ccad7c1579ee6`.
-- Đã tải file về, kiểm tra CRC toàn bộ ZIP, có AndroidManifest/classes.dex, có bundle `assets/index.android.bundle` và APK signing block. Hai ảnh mẫu JPEG trong APK khớp SHA-256 với source.
-- Đây là kiểm tra cấu trúc/tính toàn vẹn file; chưa kiểm tra mật mã chứng chỉ bằng apksigner hoặc chạy trên thiết bị. Không coi build thành công là chứng minh toàn bộ chức năng runtime.
+- [Tải APK RentGuard 1.0.1](https://expo.dev/artifacts/eas/_BT4ZClvZnWAUg6tWH7SSB2IArtGvlRrVqbHy454mHo.apk); bản local: `artifacts/RentGuard-1.0.1.apk`.
+- Android package `vn.rentguard.app`, version1.0.1, versionCode2, SDK58, profile preview, distribution internal. Manifest thực tế: minSdk24, targetSdk36, cho phép HTTP LAN.
+- Có giao diện xanh dương, hành vi dùng lại/đọc lại báo cáo và native module Expo Crypto. Mobile source commit `4b3057c`; mã Mobile hiện tại khớp nguồn đã build. Backend sửa tương thích OpenAI ở commit `2e5a673`, chạy riêng và không nằm trong APK.
+- Dung lượng: **100.421.268 bytes**, khoảng95,77 MiB.
+- SHA-256: `7ead3eed4c63540ecc596b32aa161c1fef718182cf1ea989e81533cf53636fcb`.
+- Đã kiểm tra CRC toàn bộ ZIP, manifest/DEX, bundle `assets/index.android.bundle`, native `CryptoModule` trong DEX; hai ảnh mẫu JPEG khớp SHA-256 với source mới.
+- **Chữ ký mật mã hợp lệ** theo Google/AOSP apksig9.5.1, APK Signature Scheme v2, không lỗi. SHA-256 chứng chỉ `c264578d467370eadf170893be14aeecc6b30c07ae803b31069b00b584a1d398`, khớp APK1.0.0. Thư viện kiểm tra tải từ Google Maven và đối chiếu checksum của nguồn.
+- Archive trước upload có73 files, đầy đủ source/types/ảnh mẫu, không có Backend, `.env` hoặc khóa bí mật. API Key tiếp tục chỉ ở laptop.
+- **Chưa cài/chạy APK trên Android thật trong phiên này.** Kiểm tra chữ ký, bundle và OpenAI mẫu không thay thế nghiệm thu camera, quyền, bố cục và lưu/mở lại trên thiết bị.
 
-Metadata kiểm tra file ở `artifacts/apk-verification.json`, thông tin build ở `artifacts/build-info.json`. Các server kiểm thử Metro/Backend đã dừng để giải phóng cổng; khởi động lại theo README khi sử dụng.
+Hướng dẫn cài và kết nối Backend: [APK_INSTALL.md](APK_INSTALL.md). Metadata: `artifacts/build-info.json`, `artifacts/apk-verification.json`, `artifacts/apk-1.0.1-signature.json`. APK cũ1.0.0 ở `artifacts/RentGuard-preview.apk`, thông tin cũ giữ trong `artifacts/build-info-1.0.0.json`; không dùng bản cũ để kiểm tra UI/pipeline mới. Server smoke test đã đóng; chạy Backend theo README khi dùng AI thật.
