@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useRentGuard } from '@/state/rentguard';
+import { SAMPLE_ENABLED } from '@/domain/features';
 import { Badge, Button, Card, colors, Screen, SourceBadge, textStyles } from '@/ui';
 
 function serverInfo(value: string) {
@@ -77,11 +78,11 @@ export default function HomeScreen() {
       </Pressable>)}
     </View> : null}
 
-    <Card style={styles.demoCard}>
+    {SAMPLE_ENABLED ? <Card style={styles.demoCard}>
       <View style={styles.demoTop}><View style={styles.demoTitle}><Feather name="play-circle" size={21} color={colors.primary} /><Text style={[textStyles.section, { flexShrink: 1 }]}>Thử trước với bản mẫu</Text></View><Badge tone="medium">Mẫu</Badge></View>
       <Text style={textStyles.muted}>Xem cách đọc báo cáo và hỏi đáp với dữ liệu soạn sẵn. Không gửi ảnh hay gọi OpenAI.</Text>
       <Button title="Xem báo cáo mẫu" icon="arrow-right" variant="ghost" loading={demoLoading} onPress={() => { void viewDemo(); }} />
-    </Card>
+    </Card> : null}
     <View style={styles.disclaimer}><Feather name="info" size={15} color={colors.muted} /><Text style={styles.disclaimerText}>RentGuard hỗ trợ đọc hiểu hợp đồng. Hãy đối chiếu ảnh gốc và tìm tư vấn chuyên môn khi cần.</Text></View>
   </Screen>;
 }

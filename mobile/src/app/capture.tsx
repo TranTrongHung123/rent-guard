@@ -52,12 +52,12 @@ export default function CaptureScreen() {
   const footer = <View style={styles.submitArea}>
     {analyzing ? <>
       <View style={styles.busyLine}><ActivityIndicator color={colors.primary} /><View style={{ flex: 1, gap: 3 }}>
-        <Text accessibilityLiveRegion="polite" style={textStyles.label}>{analysisState === 'preparing' ? 'Đang chuẩn bị ảnh…' : 'Đang phân tích hợp đồng…'}</Text>
+        <Text accessibilityLiveRegion="polite" style={textStyles.label}>{analysisState === 'preparing' ? 'Đang chuẩn bị ảnh…' : analysisState === 'saving' ? 'Đang lưu báo cáo trên máy…' : 'Đang phân tích hợp đồng…'}</Text>
         <Text style={textStyles.caption}>Hợp đồng nhiều trang có thể mất vài phút.</Text>
       </View></View>
-      <Button title="Hủy phân tích" variant="ghost" onPress={cancelAnalysis} />
+      <Button title="Hủy phân tích" variant="ghost" disabled={analysisState === 'saving'} onPress={cancelAnalysis} />
     </> : <>
-      {draftPages.length > 0 ? <View style={styles.privacyLine}><Feather name="lock" size={14} color={colors.muted} /><Text style={styles.privacyText}>Nhấn phân tích để gửi ảnh đến máy chủ của bạn và OpenAI.</Text></View> : null}
+      {draftPages.length > 0 ? <View style={styles.privacyLine}><Feather name="lock" size={14} color={colors.muted} /><Text style={styles.privacyText}>Ảnh được gửi đến máy chủ và OpenAI. Báo cáo, ảnh và hội thoại được tự lưu trên điện thoại; bạn có thể xóa trong Lịch sử.</Text></View> : null}
       <Button title={draftPages.length ? `Phân tích ${draftPages.length} trang` : 'Thêm ảnh để bắt đầu'} icon="arrow-right" disabled={!draftPages.length || busy || hasUnreadableImage} onPress={() => void startAnalysis()} />
     </>}
   </View>;

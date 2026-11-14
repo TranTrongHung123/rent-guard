@@ -16,43 +16,44 @@ function compile(relativePath, imports) {
 
 // Exercise actual provider commands and refs without pretending to render a
 // native screen. Expo, hooks and storage are explicit test-only fixtures.
-function provider() {
+function provider({ failedWrites = 0, sampleEnabled = true } = {}) {
   const core = compile('src/domain/core.ts', {});
   const analysis = compile('src/domain/analysis.ts', {});
   const calls = []; const writes = []; const deletions = [];
+  let failuresLeft = failedWrites;
   let selected = []; let gate;
   const image = id => ({ id, uri: `file:///rentguard-pages/${id}.jpg`, width: 1200, height: 1600, mimeType: 'image/jpeg' });
   const api = { analyzePages: async (_url, pages, _signal, options) => {
     calls.push({ pages, options }); const index = calls.length;
     if (gate) await gate;
     return { report: { id: `report-${index}`, title: 'Hợp đồng thuê nhà', createdAt: '2026-11-14T00:00:00.000Z', source: 'openai', model: 'fixture', summary: 'Chưa có điểm đủ bằng chứng.', findings: [], missingInformation: [], warnings: [], pages: pages.map((page, number) => ({ id: page.id, pageNumber: number + 1, status: 'readable', text: 'Nội dung hợp đồng fixture.', warning: null })), analysis: { version: 'rentguard-v2.0.0', policyId: 'a'.repeat(64), inputFingerprint: createHash('sha256').update(analysis.fingerprintInput(pages)).digest('hex'), analyzedAt: '2026-11-14T00:00:00.000Z', reuse: 'none' } }, analysisToken: 'signed-fixture' };
-  } };
+  }, askContract: async () => ({ message: { id: 'reply-1', role: 'assistant', source: 'openai', createdAt: '2026-11-14T00:00:01.000Z', content: 'Cần đối chiếu ảnh gốc.', evidence: [] } }) };
   const jsx = (type, props) => ({ type, props });
   const module = compile('src/state/rentguard.tsx', {
     'react/jsx-runtime': { jsx, jsxs: jsx },
     react: { createContext: () => ({ Provider: 'FixtureProvider' }), useContext: () => null, useRef: current => ({ current }), useState: initial => [initial, () => {}], useEffect: () => {} },
     'expo-asset': { Asset: {} }, 'expo-crypto': { CryptoDigestAlgorithm: { SHA256: 'sha256' }, digestStringAsync: async (_algorithm, input) => createHash('sha256').update(input).digest('hex') },
-    '@/domain/analysis': analysis, '@/domain/core': core, '@/domain/demo': {}, '@/domain/paths': {}, '@/services/api': api,
-    '@/services/images': { selectImages: async () => selected, pageDataUrl: async page => `data:image/jpeg;base64,${Buffer.from(page.uri).toString('base64')}`, deletePageFiles: async pages => { deletions.push(...pages); } },
-    '@/services/storage': { writeRecord: async record => { writes.push(structuredClone(record)); }, removeRecord: async () => {} },
+    '@/domain/analysis': analysis, '@/domain/core': core, '@/domain/features': { REQUIRE_HTTPS: false, SAMPLE_ENABLED: sampleEnabled }, '@/domain/demo': {}, '@/domain/paths': {}, '@/services/api': api,
+    '@/services/images': { localId: prefix => `${prefix}-fixture`, selectImages: async () => selected, pageDataUrl: async page => `data:image/jpeg;base64,${Buffer.from(page.uri).toString('base64')}`, deletePageFiles: async pages => { deletions.push(...pages); } },
+    '@/services/storage': { writeRecord: async record => { if (failuresLeft-- > 0) throw new Error('Fixture storage full'); writes.push(structuredClone(record)); }, removeRecord: async () => {} },
   });
   const state = module.RentGuardProvider({ children: null }).props.value;
   return { state, calls, writes, deletions, pick: async id => { selected = [image(id)]; await state.pickImages('library'); }, hold: () => { let release; gate = new Promise(resolve => { release = resolve; }); return release; } };
 }
 
-test('reading a report again preserves its snapshot and draft images, creates a separate unsaved record', async () => {
+test('analysis and reading again auto-save separate reports while preserving snapshots and draft images', async () => {
   const fixture = provider();
   await fixture.pick('original'); const oldId = await fixture.state.analyze();
-  await fixture.state.saveRecord(oldId);
+  assert.equal(fixture.state.getRecord(oldId).isSaved, true);
   const original = structuredClone(fixture.state.getRecord(oldId));
   await fixture.pick('next-contract-draft');
   const newId = await fixture.state.reanalyzeRecord(oldId);
   assert.notEqual(oldId, newId);
   assert.deepEqual(structuredClone(fixture.state.getRecord(oldId)), original);
-  assert.equal(fixture.state.getRecord(newId).isSaved, false);
+  assert.equal(fixture.state.getRecord(newId).isSaved, true);
   assert.equal(fixture.calls[1].options.forceRefresh, true);
   assert.equal(fixture.calls[1].pages[0].id, 'original');
-  assert.equal(fixture.writes.length, 1, 'fresh results require explicit Save');
+  assert.equal(fixture.writes.length, 2, 'each accepted AI report is persisted before navigation');
   await fixture.state.analyze();
   assert.equal(fixture.calls[2].pages[0].id, 'next-contract-draft');
   assert.equal(fixture.deletions.length, 0);
@@ -68,4 +69,26 @@ test('cancelled reading preserves the original report and prevents deletion whil
   assert.deepEqual(structuredClone(fixture.state.getRecord(oldId)), original);
   assert.equal(fixture.state.getRecord('report-2'), undefined);
   assert.equal(fixture.deletions.length, 0);
+});
+test('autosave failure preserves the valid report and images, and manual retry does not call AI again', async () => {
+  const fixture = provider({ failedWrites: 1 }); await fixture.pick('original');
+  const id = await fixture.state.analyze();
+  assert.ok(id); assert.equal(fixture.state.getRecord(id).isSaved, false);
+  assert.equal(fixture.state.getRecord(id).localPages[0].id, 'original');
+  await fixture.state.saveRecord(id);
+  assert.equal(fixture.state.getRecord(id).isSaved, true);
+  assert.equal(fixture.calls.length, 1); assert.equal(fixture.deletions.length, 0);
+});
+test('successful chat retries persistence when initial autosave failed', async () => {
+  const fixture = provider({ failedWrites: 1 }); await fixture.pick('original');
+  const id = await fixture.state.analyze();
+  await fixture.state.sendMessage(id, 'Điều khoản tiền cọc?');
+  assert.equal(fixture.state.getRecord(id).isSaved, true);
+  assert.equal(fixture.state.getRecord(id).messages.length, 2);
+  assert.equal(fixture.writes.length, 1);
+});
+test('release flag prevents opening a canned sample without changing its source label', async () => {
+  const fixture = provider({ sampleEnabled: false });
+  await assert.rejects(fixture.state.openDemo(), /AI thật/);
+  assert.equal(fixture.calls.length, 0); assert.equal(fixture.writes.length, 0);
 });

@@ -1,5 +1,6 @@
 import type { AnalyzeRequest, AnalyzeResponse, ApiError, ChatRequest, ChatResponse, HealthResponse } from '@/types';
 import { normalizeApiUrl } from '@/domain/core';
+import { REQUIRE_HTTPS } from '@/domain/features';
 
 export async function request<T>(baseUrl: string, path: string, body?: unknown, options: { signal?: AbortSignal; timeout?: number } = {}): Promise<T> {
   const controller = new AbortController();
@@ -9,7 +10,7 @@ export async function request<T>(baseUrl: string, path: string, body?: unknown, 
   options.signal?.addEventListener('abort', cancel);
   const timer = setTimeout(() => { timedOut = true; controller.abort(); }, options.timeout ?? 15000);
   try {
-    const serverUrl = normalizeApiUrl(baseUrl);
+    const serverUrl = normalizeApiUrl(baseUrl, REQUIRE_HTTPS);
     const requestOptions: RequestInit = {
       method: body === undefined ? 'GET' : 'POST',
       headers: { Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
@@ -25,6 +26,7 @@ export async function request<T>(baseUrl: string, path: string, body?: unknown, 
       if (controller.signal.aborted) throw error;
       const hostname = new URL(serverUrl).hostname;
       const loopback = hostname === 'localhost' || hostname === '[::1]' || /^127\./.test(hostname);
+      if (new URL(serverUrl).protocol === 'https:') throw new Error(`Không kết nối được máy chủ ${serverUrl}. Kiểm tra Internet và thử lại. Nếu máy chủ đang khởi động, hãy chờ khoảng một phút rồi kiểm tra lại trong Kết nối. Báo cáo đã lưu vẫn mở được trong Lịch sử.`);
       throw new Error(`Không kết nối được máy chủ ${serverUrl}. ${loopback
         ? 'Trên điện thoại thật, vào Kết nối và nhập IP Wi-Fi của laptop thay cho localhost.'
         : 'Kiểm tra địa chỉ trong Kết nối, Wi-Fi và backend trên laptop.'} Nếu dùng iPhone, kiểm tra quyền Mạng cục bộ của Expo Go hoặc RentGuard trong Cài đặt.`);

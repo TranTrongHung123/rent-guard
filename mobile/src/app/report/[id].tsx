@@ -90,6 +90,7 @@ function ReportDetails({ id }: { id: string }) {
   </View>}>
     <BackHeader title="Báo cáo hợp đồng" subtitle={`${report.pages.length} trang · ${formatReportDate(report.createdAt)}`} />
     <View style={styles.titleSection}><SourceBadge source={report.source} /><Text accessibilityRole="header" style={textStyles.title}>{report.title}</Text></View>
+    {report.source === 'openai' && !record.isSaved ? <Notice tone="warning" title="Báo cáo chưa được lưu trên máy">Kết quả vẫn đang mở trong phiên này. Hãy nhấn Lưu báo cáo và kiểm tra dung lượng điện thoại trước khi đóng ứng dụng.</Notice> : null}
     {report.source === 'openai' && report.analysis && report.analysis.reuse !== 'none' ? <Notice title={provenance.title}>{provenance.description}</Notice> : null}
     {report.source === 'demo' ? <Notice tone="warning" title="Bạn đang xem dữ liệu mẫu">Hợp đồng và kết quả được chuẩn bị sẵn, không phải phân tích từ OpenAI.</Notice> : null}
 
@@ -140,8 +141,8 @@ function ReportDetails({ id }: { id: string }) {
         <Text accessibilityRole="header" style={textStyles.section}>{refreshBusy ? 'Đang đọc lại hợp đồng' : 'Tạo một lần phân tích mới?'}</Text>
         <Text style={textStyles.muted}>Ảnh gốc sẽ được gửi lại đến máy chủ và OpenAI, có thể phát sinh chi phí API. Kết quả mới có thể khác do AI đọc và đánh giá lại. Báo cáo hiện tại được giữ nguyên.</Text>
         {error ? <Notice tone="error">{error}</Notice> : null}
-        <Button title={refreshBusy ? (analysisState === 'preparing' ? 'Đang chuẩn bị ảnh…' : 'Đang đọc và kiểm chứng…') : 'Đọc lại bằng OpenAI'} icon="refresh-cw" loading={refreshBusy} onPress={() => void refresh()} />
-        <Button title={refreshBusy ? 'Hủy đọc lại' : 'Giữ kết quả hiện tại'} variant="ghost" onPress={() => { if (refreshBusy) cancelAnalysis(); else setConfirmRefresh(false); }} />
+        <Button title={refreshBusy ? (analysisState === 'preparing' ? 'Đang chuẩn bị ảnh…' : analysisState === 'saving' ? 'Đang lưu báo cáo…' : 'Đang đọc và kiểm chứng…') : 'Đọc lại bằng OpenAI'} icon="refresh-cw" loading={refreshBusy} onPress={() => void refresh()} />
+        <Button title={refreshBusy ? 'Hủy đọc lại' : 'Giữ kết quả hiện tại'} variant="ghost" disabled={analysisState === 'saving'} onPress={() => { if (refreshBusy) cancelAnalysis(); else setConfirmRefresh(false); }} />
       </Card></ScrollView></View>
     </Modal>
   </Screen>;

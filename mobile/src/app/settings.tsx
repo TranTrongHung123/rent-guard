@@ -5,6 +5,7 @@ import { Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { normalizeApiUrl } from '@/domain/core';
+import { REQUIRE_HTTPS, SAMPLE_ENABLED } from '@/domain/features';
 import { health as getServerHealth } from '@/services/api';
 import { useRentGuard } from '@/state/rentguard';
 import { Badge, Button, Card, colors, Heading, Notice, Screen, textStyles } from '@/ui';
@@ -25,7 +26,7 @@ export default function SettingsScreen() {
     if (busy) return;
     setBusy(true); setFeedback(null); setHealth(null); clearError(); Keyboard.dismiss();
     try {
-      const normalized = normalizeApiUrl(url);
+      const normalized = normalizeApiUrl(url, REQUIRE_HTTPS);
       if (normalized !== apiUrl) await setApiUrl(normalized);
       setUrl(null);
       // Use this checked address directly; provider state may not have rerendered
@@ -40,19 +41,19 @@ export default function SettingsScreen() {
   return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={insets.top}><Screen>
     <Heading title="Kết nối" subtitle="Kết nối máy chủ một lần để bắt đầu phân tích hợp đồng." />
     <Card style={styles.connectionCard}>
-      <View style={styles.cardHeader}><View style={styles.icon}><Feather name="wifi" size={24} color={colors.primary} /></View><View style={{ flex: 1, gap: 4 }}><Text style={textStyles.section}>Máy chủ phân tích</Text><Text style={textStyles.caption}>Laptop và điện thoại cùng Wi-Fi</Text></View></View>
+      <View style={styles.cardHeader}><View style={styles.icon}><Feather name="wifi" size={24} color={colors.primary} /></View><View style={{ flex: 1, gap: 4 }}><Text style={textStyles.section}>Máy chủ phân tích</Text><Text style={textStyles.caption}>{REQUIRE_HTTPS ? 'Dùng Internet qua Wi-Fi hoặc dữ liệu di động' : 'Máy chủ HTTPS hoặc laptop trong mạng Wi-Fi'}</Text></View></View>
       <View style={{ gap: 8 }}><Text style={textStyles.label}>Địa chỉ máy chủ</Text>
         <TextInput accessibilityLabel="Địa chỉ máy chủ phân tích" value={url} onChangeText={value => { setUrl(value); setFeedback(null); setHealth(null); }} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-          autoCapitalize="none" autoCorrect={false} keyboardType="url" returnKeyType="go" onSubmitEditing={() => void connect()} placeholder="http://192.168.1.10:4000" placeholderTextColor={colors.muted}
+          autoCapitalize="none" autoCorrect={false} keyboardType="url" returnKeyType="go" onSubmitEditing={() => void connect()} placeholder={REQUIRE_HTTPS ? 'Địa chỉ HTTPS được cung cấp cùng ứng dụng' : 'http://192.168.1.10:4000'} placeholderTextColor={colors.muted}
           style={[styles.urlInput, focused && styles.focusedInput]} editable={!busy} selectTextOnFocus />
-        <Text style={textStyles.caption}>Nhập IP Wi-Fi của laptop và cổng, ví dụ :4000. Không dùng localhost trên điện thoại.</Text>
+        <Text style={textStyles.caption}>{REQUIRE_HTTPS ? 'Máy chủ đã được thiết lập sẵn. Nhấn kiểm tra kết nối trước khi phân tích.' : 'Nhập địa chỉ HTTPS hoặc IP Wi-Fi của laptop và cổng :4000.'}</Text>
       </View>
       <Button title={changed ? 'Lưu và kiểm tra kết nối' : 'Kiểm tra kết nối'} icon="arrow-right" loading={busy} disabled={busy || !url.trim()} onPress={() => void connect()} />
       {feedback ? <Notice tone="error" title="Chưa kết nối được"><Text style={textStyles.body}>{feedback}</Text></Notice> : null}
       {health ? <View style={styles.health}>
         <View style={styles.healthHeading}><Feather name="check-circle" size={21} color={colors.low} /><Text style={styles.healthTitle}>Đã kết nối máy chủ</Text></View>
         <View style={styles.statusRow}><Text style={textStyles.body}>Phân tích AI</Text><Badge tone={health.configured ? 'primary' : 'medium'}>{health.configured ? 'Đã cấu hình' : 'Chưa sẵn sàng'}</Badge></View>
-        <Text style={textStyles.muted}>{health.configured ? 'Bạn có thể gửi hợp đồng để phân tích. Kết quả thành công sẽ xác nhận kết nối OpenAI thực tế.' : 'Máy chủ chưa có khóa OpenAI. Bạn vẫn có thể khám phá báo cáo mẫu.'}</Text>
+        <Text style={textStyles.muted}>{health.configured ? 'Bạn có thể gửi hợp đồng để phân tích. Kết quả thành công sẽ xác nhận kết nối OpenAI thực tế.' : `Máy chủ chưa có khóa OpenAI.${SAMPLE_ENABLED ? ' Bạn vẫn có thể khám phá báo cáo mẫu.' : ' Hãy liên hệ người quản lý máy chủ.'}`}</Text>
         {health.configured ? <Text style={textStyles.caption}>Mô hình: {health.model}</Text> : null}
       </View> : null}
       {draftPages.length > 0 ? <Button title={`Tiếp tục với ${draftPages.length} trang đã chọn`} icon="file-text" variant="secondary" onPress={() => router.navigate('/capture')} /> : null}
@@ -63,9 +64,9 @@ export default function SettingsScreen() {
         <View style={styles.helpHeading}><Feather name="help-circle" size={20} color={colors.primary} /><Text style={[textStyles.label, { flex: 1 }]}>Cần trợ giúp kết nối?</Text></View><Feather name={showHelp ? 'chevron-up' : 'chevron-down'} size={20} color={colors.muted} />
       </Pressable>
       {showHelp ? <View style={{ gap: 14 }}>
-        <View style={styles.instruction}><Text style={styles.stepNumber}>1</Text><Text style={styles.instructionText}>Giữ máy chủ RentGuard đang chạy trên laptop và kết nối hai thiết bị cùng Wi-Fi.</Text></View>
-        <View style={styles.instruction}><Text style={styles.stepNumber}>2</Text><Text style={styles.instructionText}>Dùng địa chỉ IP Wi-Fi của laptop, kèm cổng máy chủ. Lưu địa chỉ mới rồi kiểm tra lại.</Text></View>
-        <View style={styles.instruction}><Text style={styles.stepNumber}>3</Text><Text style={styles.instructionText}>Trên iPhone, cho phép Expo Go hoặc RentGuard truy cập Mạng cục bộ trong Cài đặt. Safari mở được máy chủ chưa có nghĩa ứng dụng đã được cấp quyền.</Text></View>
+        <View style={styles.instruction}><Text style={styles.stepNumber}>1</Text><Text style={styles.instructionText}>{REQUIRE_HTTPS ? 'Kiểm tra Internet, thử chuyển giữa Wi-Fi và dữ liệu di động.' : 'Giữ máy chủ RentGuard đang chạy và kiểm tra mạng của hai thiết bị.'}</Text></View>
+        <View style={styles.instruction}><Text style={styles.stepNumber}>2</Text><Text style={styles.instructionText}>{REQUIRE_HTTPS ? 'Nếu máy chủ vừa khởi động, chờ khoảng một phút rồi kiểm tra lại kết nối.' : 'Dùng địa chỉ HTTPS hoặc IP Wi-Fi của laptop, kèm cổng máy chủ.'}</Text></View>
+        <View style={styles.instruction}><Text style={styles.stepNumber}>3</Text><Text style={styles.instructionText}>{REQUIRE_HTTPS ? 'Lịch sử đã lưu vẫn mở được khi mạng gián đoạn. Hãy kiểm tra kết nối trước khi gửi ảnh hoặc hỏi AI.' : 'Trên iPhone khi dùng LAN, kiểm tra quyền Mạng cục bộ của Expo Go hoặc RentGuard.'}</Text></View>
       </View> : null}
     </Card>
 

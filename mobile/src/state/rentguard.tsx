@@ -2,7 +2,8 @@ import { createContext, useContext, useEffect, useRef, useState, type PropsWithC
 import { Asset } from 'expo-asset';
 import * as Crypto from 'expo-crypto';
 import { fingerprintInput, previousAnalysis } from '@/domain/analysis';
-import { MAX_PAGES, MAX_QUESTION_LENGTH, messageOf, moveItem, normalizeApiUrl, validateSavedRecord } from '@/domain/core';
+import { MAX_PAGES, MAX_QUESTION_LENGTH, messageOf, moveItem, normalizeApiUrl, selectApiUrl, validateSavedRecord } from '@/domain/core';
+import { REQUIRE_HTTPS, SAMPLE_ENABLED } from '@/domain/features';
 import { createDemoAnswer, createDemoRecord } from '@/domain/demo';
 import { managedFileName } from '@/domain/paths';
 import { analyzePages, askContract, health } from '@/services/api';
@@ -24,7 +25,7 @@ interface RentGuardState {
   clearDraft(): Promise<void>;
   analyze(): Promise<string | null>;
   reanalyzeRecord(id: string): Promise<string | null>;
-  analysisState: 'idle' | 'preparing' | 'analyzing';
+  analysisState: 'idle' | 'preparing' | 'analyzing' | 'saving';
   cancelAnalysis(): void;
   openDemo(): Promise<string>;
   records: SavedAnalysis[];
@@ -53,6 +54,7 @@ export function RentGuardProvider({ children }: PropsWithChildren) {
   const pagesRef = useRef<LocalPage[]>([]);
   const [analysisState, setAnalysisState] = useState<RentGuardState['analysisState']>('idle');
   const analysisRef = useRef<AbortController | null>(null);
+  const savingAnalysisRef = useRef(false);
   const analyzingRecordRef = useRef<string | null>(null);
   const pickerBusy = useRef(false);
   const [chatBusy, setChatBusy] = useState(false);
@@ -86,7 +88,9 @@ export function RentGuardProvider({ children }: PropsWithChildren) {
         }
         if (!live) return;
         updateItems(() => restored);
-        if (url) setUrl(normalizeApiUrl(url));
+        const selectedUrl = selectApiUrl(DEFAULT_URL, url, REQUIRE_HTTPS);
+        setUrl(selectedUrl);
+        if (url && url !== selectedUrl) await writeApiUrl(selectedUrl).catch(() => setError('Chưa lưu được địa chỉ máy chủ mới. Ứng dụng đang dùng máy chủ HTTPS trong phiên này.'));
         if (loaded.corrupted) {
           setError(`${loaded.corrupted} mục lịch sử không đọc được. Dữ liệu đã được giữ lại; các mục còn lại vẫn sử dụng được.`);
         } else if (restored.filter((record) => record.report.source === 'openai').every((record) => record.localPages.every((page) => managedFileName(page.uri)))) {
@@ -102,7 +106,7 @@ export function RentGuardProvider({ children }: PropsWithChildren) {
   const getRecord = (id: string) => itemsRef.current.find((item) => item.id === id);
 
   async function setApiUrl(url: string) {
-    try { const normalized = normalizeApiUrl(url); await writeApiUrl(normalized); setUrl(normalized); setError(null); }
+    try { const normalized = normalizeApiUrl(url, REQUIRE_HTTPS); await writeApiUrl(normalized); setUrl(normalized); setError(null); }
     catch (cause) { fail(cause); }
   }
 
@@ -173,9 +177,19 @@ export function RentGuardProvider({ children }: PropsWithChildren) {
       }
       updateItems((current) => [item, ...current]);
       if (consumeDraft) updatePages([]);
+      setAnalysisState('saving');
+      savingAnalysisRef.current = true;
+      await enqueue(async () => {
+        try {
+          await writeRecord(item);
+          updateItems(current => current.map(record => record.id === item.id ? { ...record, isSaved: true } : record));
+        } catch {
+          setError('Đã phân tích xong nhưng chưa lưu được báo cáo. Hãy nhấn Lưu báo cáo trước khi đóng ứng dụng; kiểm tra dung lượng điện thoại rồi thử lại.');
+        }
+      });
       return item.id;
     } catch (cause) { if (!controller.signal.aborted) setError(messageOf(cause)); return null; }
-    finally { analysisRef.current = null; setAnalysisState('idle'); }
+    finally { savingAnalysisRef.current = false; analysisRef.current = null; setAnalysisState('idle'); }
   }
 
   async function analyze() { return runAnalysis([...pagesRef.current]); }
@@ -190,6 +204,7 @@ export function RentGuardProvider({ children }: PropsWithChildren) {
   }
 
   async function openDemo(): Promise<string> {
+    if (!SAMPLE_ENABLED) return fail(new Error('Bản này dùng hợp đồng bạn cung cấp để phân tích AI thật.'));
     try {
       const localPages = await loadDemoPages();
       const item = createDemoRecord(localPages, localId('demo'));
@@ -246,8 +261,8 @@ export function RentGuardProvider({ children }: PropsWithChildren) {
         if (!latest) throw new Error('Báo cáo đã bị xóa.');
         let next = { ...latest, messages: [...latest.messages, user, answer] };
         if (!validateSavedRecord(next)) throw new Error('Bằng chứng trong câu trả lời không hợp lệ. Nội dung chưa được thêm vào hội thoại; hãy thử lại.');
-        if (next.isSaved) {
-          try { await writeRecord(next); }
+        if (next.isSaved || next.report.source === 'openai') {
+          try { await writeRecord(next); next = { ...next, isSaved: true }; }
           catch { next = { ...next, isSaved: false }; setError('Đã nhận câu trả lời nhưng chưa lưu được hội thoại. Hãy nhấn Lưu báo cáo để thử lại.'); }
         }
         updateItems((current) => current.map((record) => record.id === id ? next : record));
@@ -256,7 +271,7 @@ export function RentGuardProvider({ children }: PropsWithChildren) {
     finally { chatRef.current = null; setChatBusy(false); }
   }
 
-  return <Context.Provider value={{ ready, error, clearError: () => setError(null), apiUrl, setApiUrl, checkBackend, draftPages, pickImages, removePage, movePage, clearDraft, analyze, reanalyzeRecord, analysisState, cancelAnalysis: () => analysisRef.current?.abort(), openDemo, records: items.filter((item) => item.isSaved), getRecord, saveRecord, deleteRecord, sendMessage, chatBusy }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ ready, error, clearError: () => setError(null), apiUrl, setApiUrl, checkBackend, draftPages, pickImages, removePage, movePage, clearDraft, analyze, reanalyzeRecord, analysisState, cancelAnalysis: () => { if (!savingAnalysisRef.current) analysisRef.current?.abort(); }, openDemo, records: items.filter((item) => item.isSaved), getRecord, saveRecord, deleteRecord, sendMessage, chatBusy }}>{children}</Context.Provider>;
 }
 
 export function useRentGuard() {

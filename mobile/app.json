@@ -2,7 +2,7 @@
   "expo": {
     "name": "RentGuard",
     "slug": "rentguard",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/rentguard-icon.png",
     "scheme": "rentguard",
@@ -20,7 +20,7 @@
     },
     "android": {
       "package": "vn.rentguard.app",
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
         "backgroundColor": "#2563EB",
         "foregroundImage": "./assets/images/rentguard-icon.png"

@@ -4,14 +4,24 @@ export const MAX_PAGES = 20;
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 export const MAX_QUESTION_LENGTH = 2000;
 
-export function normalizeApiUrl(value: string): string {
+export function normalizeApiUrl(value: string, httpsOnly = false): string {
   const raw = value.trim().replace(/\/+$/, '');
   let url: URL;
   try { url = new URL(raw); } catch { throw new Error('Địa chỉ máy chủ chưa đúng. Ví dụ: http://192.168.1.10:4000'); }
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash || url.pathname !== '/') {
     throw new Error('Nhập địa chỉ HTTP/HTTPS của máy chủ, không kèm đường dẫn, mật khẩu hoặc tham số.');
   }
+  if (httpsOnly && (url.protocol !== 'https:' || ['localhost', '[::1]'].includes(url.hostname) || /^127\./.test(url.hostname))) {
+    throw new Error('Bản này dùng máy chủ HTTPS. Hãy nhập địa chỉ HTTPS được cung cấp cùng ứng dụng.');
+  }
   return url.origin;
+}
+
+export function selectApiUrl(defaultUrl: string, savedUrl: string | null, httpsOnly = false): string {
+  const fallback = normalizeApiUrl(defaultUrl, httpsOnly);
+  if (!savedUrl) return fallback;
+  try { return normalizeApiUrl(savedUrl, httpsOnly); }
+  catch { return fallback; }
 }
 
 export function moveItem<T extends { id: string }>(items: T[], id: string, direction: -1 | 1): T[] {

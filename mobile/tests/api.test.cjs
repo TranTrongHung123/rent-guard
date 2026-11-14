@@ -29,8 +29,8 @@ function compile(relativePath, imports = {}, globals = {}) {
 }
 
 const core = compile('src/domain/core.ts');
-function client(fetchImplementation = fetch) {
-  return compile('src/services/api.ts', { '@/domain/core': core }, { fetch: fetchImplementation });
+function client(fetchImplementation = fetch, requireHttps = false) {
+  return compile('src/services/api.ts', { '@/domain/core': core, '@/domain/features': { REQUIRE_HTTPS: requireHttps } }, { fetch: fetchImplementation });
 }
 
 async function fixtureServer(t, handler) {
@@ -244,4 +244,12 @@ test('invalid server URLs fail before any network request', async () => {
   const api = client(async () => { requests += 1; throw new Error('Unexpected network call'); });
   await assert.rejects(api.health('https://user:secret@example.test/api'), /Nhập địa chỉ HTTP\/HTTPS/);
   assert.equal(requests, 0);
+});
+test('cloud requests reject plaintext before fetch and explain HTTPS network failures without LAN advice', async () => {
+  let requests = 0;
+  const api = client(async () => { requests++; throw new Error('offline'); }, true);
+  await assert.rejects(api.health('http://192.168.1.10:4000'), /HTTPS/);
+  assert.equal(requests, 0);
+  await assert.rejects(api.health('https://rentguard-api.onrender.com'), error => /Internet/.test(error.message) && !/laptop|Mạng cục bộ/.test(error.message));
+  assert.equal(requests, 1);
 });

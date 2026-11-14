@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { moveItem, normalizeApiUrl, validateSavedRecord } from '../src/domain/core.ts';
+import { moveItem, normalizeApiUrl, selectApiUrl, validateSavedRecord } from '../src/domain/core.ts';
 
 function sampleRecord() {
   const text = 'Tiền cọc được hoàn trong 30 ngày sau bàn giao.';
@@ -35,6 +35,15 @@ test('normalizeApiUrl rejects malformed addresses, credentials, paths and query 
   for (const value of ['192.168.1.10:4000', 'ftp://example.com', 'http://user:pass@example.com', 'https://example.com/api', 'https://example.com?token=secret', 'https://example.com#fragment', '']) {
     assert.throws(() => normalizeApiUrl(value), Error, value);
   }
+});
+test('cloud release replaces an old stored LAN address while preserving custom valid HTTPS choices', () => {
+  const cloud = 'https://rentguard-api.onrender.com';
+  assert.equal(selectApiUrl(cloud, 'http://192.168.1.10:4000', true), cloud);
+  assert.equal(selectApiUrl(cloud, 'https://localhost:4000', true), cloud);
+  assert.equal(selectApiUrl(cloud, 'broken', true), cloud);
+  assert.equal(selectApiUrl(cloud, 'https://other-rentguard.onrender.com', true), 'https://other-rentguard.onrender.com');
+  assert.equal(selectApiUrl('http://localhost:4000', 'http://192.168.1.10:4000'), 'http://192.168.1.10:4000');
+  assert.throws(() => normalizeApiUrl('http://192.168.1.10:4000', true), /HTTPS/);
 });
 
 test('moving pages preserves every page and never mutates the previous order', () => {

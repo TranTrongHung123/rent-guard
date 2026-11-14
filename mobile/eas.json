@@ -1,7 +1,17 @@
 {
   "cli": { "version": ">= 18.0.0", "appVersionSource": "local" },
   "build": {
-    "preview": { "distribution": "internal", "android": { "buildType": "apk" }, "environment": "preview" },
-    "production": { "environment": "production", "android": { "buildType": "app-bundle" } }
+    "preview": {
+      "distribution": "internal", "android": { "buildType": "apk" }, "environment": "preview",
+      "env": { "EXPO_PUBLIC_REQUIRE_HTTPS": "true", "EXPO_PUBLIC_ENABLE_DEMO": "false" }
+    },
+    "preview-local": {
+      "distribution": "internal", "android": { "buildType": "apk" }, "environment": "development",
+      "env": { "EXPO_PUBLIC_REQUIRE_HTTPS": "false", "EXPO_PUBLIC_ENABLE_DEMO": "true" }
+    },
+    "production": {
+      "environment": "production", "android": { "buildType": "app-bundle" },
+      "env": { "EXPO_PUBLIC_REQUIRE_HTTPS": "true", "EXPO_PUBLIC_ENABLE_DEMO": "false" }
+    }
   }
 }

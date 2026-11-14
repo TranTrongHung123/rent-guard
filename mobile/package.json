@@ -1,6 +1,6 @@
 {
   "name": "rentguard-mobile",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "main": "expo-router/entry",
   "dependencies": {
     "@expo/ui": "~58.0.28",
@@ -43,6 +43,7 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
+    "eas-build-pre-install": "node scripts/check-build-env.cjs",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
