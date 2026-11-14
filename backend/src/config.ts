@@ -14,6 +14,8 @@ export interface Config {
   port: number; host: string; apiKey: string; model: string; timeoutMs: number;
   maxPages: number; maxImageBytes: number; maxTotalImageBytes: number;
   corsOrigins: string[]; signingSecret: string;
+  analysisCacheTtlMs?: number;
+  analysisCacheEntries?: number;
 }
 export function loadConfig(): Config {
   let signingSecret = process.env.REPORT_SIGNING_SECRET?.trim() || '';
@@ -34,6 +36,8 @@ export function loadConfig(): Config {
     maxPages: numberEnv('MAX_PAGES', 20, 1, 50),
     maxImageBytes: numberEnv('MAX_IMAGE_MB', 5, 1, 10) * 1024 * 1024,
     maxTotalImageBytes: 20 * 1024 * 1024,
+    analysisCacheTtlMs: numberEnv('ANALYSIS_CACHE_TTL_MS', 1800000, 0, 86400000),
+    analysisCacheEntries: numberEnv('ANALYSIS_CACHE_ENTRIES', 32, 0, 128),
     corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:8081,http://localhost:19006').split(',').map(v => v.trim()).filter(Boolean),
     signingSecret,
   };

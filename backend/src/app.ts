@@ -10,10 +10,15 @@ import type { StructuredAI } from './ai.js';
 import { OpenAIService } from './ai.js';
 import { ContractService } from './service.js';
 import { AppError } from './errors.js';
-import { ChatBodySchema } from './schemas.js';
+import { ChatBodySchema, ReportSchema } from './schemas.js';
+import { ANALYSIS_VERSION, analysisPolicyId } from './stability.js';
 
 export function validateImages(body: unknown, config: Config): AnalyzeRequest {
-  const parsed = z.object({ pages: z.array(z.object({ id: z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/), dataUrl: z.string() }).strict()).min(1).max(config.maxPages) }).strict().safeParse(body);
+  const parsed = z.object({
+    pages: z.array(z.object({ id: z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/), dataUrl: z.string() }).strict()).min(1).max(config.maxPages),
+    forceRefresh: z.boolean().optional(),
+    previousAnalysis: z.object({ report: ReportSchema, analysisToken: z.string().min(1).max(200) }).strict().optional(),
+  }).strict().safeParse(body);
   if (!parsed.success) throw new AppError(400, 'INVALID_INPUT', `Cung cấp từ 1 đến ${config.maxPages} trang ảnh hợp đồng với ID riêng biệt.`);
   if (new Set(parsed.data.pages.map(p => p.id)).size !== parsed.data.pages.length) throw new AppError(400, 'DUPLICATE_PAGE', 'Mỗi trang phải có một ID riêng biệt.');
   let total = 0;
@@ -40,7 +45,7 @@ export function createApp(config: Config, ai: StructuredAI = new OpenAIService(c
   app.use((req, res, next) => { res.locals.requestId = randomUUID(); res.setHeader('X-Request-Id', res.locals.requestId); res.setHeader('Cache-Control', 'no-store'); next(); });
   app.use(helmet());
   app.use(cors({ origin(origin, callback) { if (!origin || config.corsOrigins.includes(origin)) callback(null, true); else callback(new AppError(403, 'ORIGIN_NOT_ALLOWED', 'Nguồn truy cập chưa được cấu hình trong CORS_ORIGINS.')); } }));
-  app.get('/api/health', (_req, res) => res.json({ status: 'ok', aiConfigured: Boolean(config.apiKey), model: config.model, limits: { maxPages: config.maxPages, maxImageBytes: config.maxImageBytes, maxQuestionLength: 2000 } }));
+  app.get('/api/health', (_req, res) => res.json({ status: 'ok', aiConfigured: Boolean(config.apiKey), model: config.model, analysisVersion: ANALYSIS_VERSION, analysisPolicyId: analysisPolicyId(config), limits: { maxPages: config.maxPages, maxImageBytes: config.maxImageBytes, maxQuestionLength: 2000 } }));
   app.use('/api', rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: 'draft-8', legacyHeaders: false, handler: (_req, res) => res.status(429).json({ error: { code: 'RATE_LIMIT', message: 'Bạn gửi yêu cầu quá nhanh. Hãy chờ một phút rồi thử lại.', requestId: res.locals.requestId } }) }));
   // Reject oversized/missing-key workloads before reading a large image body.
   app.use(['/api/analyses', '/api/chat'], (_req, _res, next) => {

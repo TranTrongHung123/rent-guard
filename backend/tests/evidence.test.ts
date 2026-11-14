@@ -30,7 +30,7 @@ test('unsupported legal verdicts are rejected and valid findings sorted high fir
   input.findings[0]!.explanation = 'Điều khoản này bất hợp pháp.';
   assert.equal(validateFindings(input, [page]).findings.length, 0);
   input.findings[0]!.explanation = candidate.findings[0]!.explanation;
-  input.findings.unshift({ ...input.findings[0]!, severity: 'low', title: 'Chi tiết cần làm rõ' });
+  input.findings.unshift({ ...input.findings[0]!, checkId: 'OTHER_CLARIFICATION', title: 'Chi tiết cần làm rõ' });
   assert.deepEqual(validateFindings(input, [page]).findings.map(f => f.severity), ['high', 'low']);
 });
 test('signing survives JSON and key order but detects edited contract text', () => {

@@ -24,6 +24,7 @@ export interface ExtractedPage {
 }
 export interface Finding {
   id: string;
+  checkId?: string;
   ruleId: string;
   category: FindingCategory;
   severity: Severity;
@@ -44,6 +45,13 @@ export interface AnalysisReport {
   findings: Finding[];
   missingInformation: string[];
   warnings: string[];
+  analysis?: {
+    version: string;
+    policyId: string;
+    inputFingerprint: string;
+    analyzedAt: string;
+    reuse: 'none' | 'images' | 'text' | 'saved';
+  };
 }
 export interface ChatMessage {
   id: string;
@@ -53,7 +61,11 @@ export interface ChatMessage {
   createdAt: string;
   source: AnalysisSource;
 }
-export interface AnalyzeRequest { pages: { id: string; dataUrl: string }[] }
+export interface AnalyzeRequest {
+  pages: { id: string; dataUrl: string }[];
+  forceRefresh?: boolean;
+  previousAnalysis?: AnalyzeResponse;
+}
 export interface AnalyzeResponse { report: AnalysisReport; analysisToken: string }
 export interface ChatRequest {
   report: AnalysisReport;
@@ -69,4 +81,6 @@ export interface HealthResponse {
   aiConfigured: boolean;
   model: string;
   limits: { maxPages: number; maxImageBytes: number; maxQuestionLength: number };
+  analysisVersion?: string;
+  analysisPolicyId?: string;
 }

@@ -30,6 +30,8 @@ Mobile trên điện thoại phải dùng địa chỉ IPv4 LAN của laptop, v�
 | `MAX_IMAGE_MB` | `5` | Giới hạn từng ảnh, có thể cấu hình 1–10 |
 | `CORS_ORIGINS` | localhost Expo | Danh sách origin web, cách nhau dấu phẩy |
 | `REPORT_SIGNING_SECRET` | tự tạo | Chuỗi ít nhất 32 ký tự; không phải OpenAI key |
+| `ANALYSIS_CACHE_TTL_MS` | `1800000` | Thời gian giữ kết quả trong RAM (30 phút), 0 tắt cache |
+| `ANALYSIS_CACHE_ENTRIES` | `32` | Số báo cáo tối đa mỗi cache ảnh/văn bản, 0 tắt cache |
 
 Nếu không đặt `REPORT_SIGNING_SECRET`, backend tạo một lần trong `.data/signing-key` (được ignore). Giữ file này khi khởi động lại để các báo cáo đã lưu tiếp tục hỏi đáp được. Đổi/xóa secret khiến báo cáo cũ không còn xác thực: cần phân tích lại. Không lưu hợp đồng vào `.data`.
 
@@ -39,8 +41,8 @@ Tổng ảnh tối đa 20 MiB sau giải mã; JSON tối đa 30 MiB. Chấp nh�
 
 Kiểu dữ liệu đầy đủ: `../shared/contracts.ts`. Mobile dùng bản đồng bộ tự chứa để EAS có thể build từ thư mục mobile.
 
-- `GET /api/health` → `{status, aiConfigured, model, limits}`.
-- `POST /api/analyses` → body `{pages:[{id,dataUrl}]}`, giữ thứ tự ảnh; response `{report,analysisToken}`.
+- `GET /api/health` → `{status, aiConfigured, model, analysisVersion, analysisPolicyId, limits}`.
+- `POST /api/analyses` → body `{pages:[{id,dataUrl}], forceRefresh?, previousAnalysis?:{report,analysisToken}}`, giữ thứ tự ảnh; response `{report,analysisToken}`. Các tùy chọn đều không bắt buộc; client cũ vẫn gọi được.
 - `POST /api/chat` → body `{report,analysisToken,messages:[{role,content}],question}`; response `{message}`.
 - Lỗi có cùng cấu trúc `{error:{code,message,requestId}}` với thông báo tiếng Việt.
 
@@ -57,6 +59,19 @@ Kiểu dữ liệu đầy đủ: `../shared/contracts.ts`. Mobile dùng bản đ
 Mọi lời gọi OpenAI dùng `store:false`, không tạo file hay conversation lưu phía provider qua API này. Ảnh/văn bản vẫn được gửi đến OpenAI để xử lý; `store:false` không phải cam kết về toàn bộ chính sách lưu giữ dữ liệu của nhà cung cấp. Ứng dụng phải thông báo rõ trước khi gửi.
 
 Kiểm chứng giảm rủi ro, không chứng minh OCR đúng với ảnh hoặc bảo đảm không bỏ sót/không có suy luận sai. Người dùng luôn có thể đối chiếu trang ảnh gốc. Không dùng mô hình như nguồn pháp luật hay xác nhận hợp đồng an toàn.
+
+## Ổn định kết quả và phân tích lại
+
+`src/stability.ts` tạo SHA-256 cho bộ ảnh theo thứ tự (không gồm ID picker), chuẩn hóa ID trước khi gọi AI và quản lý cache RAM có TTL/LRU. Hai cache ảnh/văn bản có giới hạn riêng 32 báo cáo và 8 MiB, tổng tối đa 16 MiB nội dung JSON. Không lưu hợp đồng lên đĩa. Khóa chính sách phụ thuộc phiên bản `rentguard-v2.0.0`, model, quy tắc và secret; sửa prompt/schema phải tăng `ANALYSIS_VERSION`.
+
+- AI phải xác nhận đã rà soát đủ 16 mã trong `reviewedChecks`, không thiếu/lặp; code gán mức ưu tiên theo `checkId`, loại trùng theo mã/vị trí và sắp thứ tự cố định. Mỗi mã có thể có nhiều phát hiện ở các điều khoản khác nhau.
+- Ảnh trùng byte, đúng thứ tự: dùng lại báo cáo đã kiểm chứng, không OCR/phân tích lại.
+- Ảnh chụp lại: đọc đủ mọi trang; chỉ dùng lại khi tất cả trang `readable` và văn bản từng trang trùng sau chuẩn hóa Unicode NFC/khoảng trắng. Giữ nguyên chữ hoa/thường, dấu, dấu câu, số tiền và ranh giới trang. Mọi trích dẫn được kiểm tra/tính lại offset trên văn bản hiện tại; không mượn ID ảnh cũ. Nếu không đối chiếu được thì phân tích mới.
+- Mobile có thể gửi một báo cáo ký từ lịch sử/phiên hiện tại để dùng lại sau restart Backend. Backend kiểm tra HMAC, model, chính sách và ảnh/văn bản; không tin kết quả tự sửa. Snapshot quá lớn được Mobile bỏ qua để không làm tràn body ảnh.
+- `forceRefresh:true` luôn đọc/phân tích lại. Mobile có nút **Đọc lại từ ảnh**, giữ nguyên bản cũ và tạo báo cáo riêng. `report.analysis` ghi phiên bản, fingerprint, ngày phân tích gốc và `reuse: none/images/text/saved`; các trường này cũng được ký.
+- Các yêu cầu đồng thời cùng đầu vào chia sẻ một công việc. Một người hủy không hủy người còn chờ; tất cả hủy thì dừng OpenAI, không cache lỗi/kết quả bị hủy.
+
+Sampling dùng `temperature:0` khi model hỗ trợ; chỉ bỏ tham số và thử lại nếu provider trả 400 nêu rõ `temperature` với `unsupported_parameter/unsupported_value`. Không thử lại kiểu này với lỗi quyền, quota hay đầu vào khác. Temperature thấp không bảo đảm AI tất định. Ảnh mới có OCR khác, cache hết hạn mà không có báo cáo ký phù hợp, model/quy tắc đổi hoặc chủ động đọc lại vẫn có thể cho danh sách khác. Để kiểm tra phiên bản mới, phân tích mới một lần; báo cáo cũ giữ nguyên và vẫn mở được.
 
 ## Kiểm thử
 

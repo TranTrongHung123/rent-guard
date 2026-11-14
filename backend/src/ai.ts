@@ -5,7 +5,7 @@ import type { AnalyzeRequest, ChatRequest, ExtractedPage, Evidence } from '../..
 import type { Config } from './config.js';
 import { AppError } from './errors.js';
 import { AnswerSchema, CandidateAnalysisSchema, ExtractedSchema, GroundingSchema, type Answer, type CandidateAnalysis } from './schemas.js';
-import { CONTRACT_RULES, SAFETY_INSTRUCTIONS, SEVERITY_RUBRIC } from './rules.js';
+import { CONTRACT_CHECKS, SAFETY_INSTRUCTIONS, SEVERITY_RUBRIC } from './rules.js';
 
 export interface ClaimToReview { id: string; text: string; evidence: Evidence[] }
 export interface StructuredAI {
@@ -17,20 +17,33 @@ export interface StructuredAI {
 
 export class OpenAIService implements StructuredAI {
   private client: OpenAI | null;
+  private temperatureSupported = true;
   constructor(private config: Config, client?: OpenAI) {
     this.client = client ?? (config.apiKey ? new OpenAI({ apiKey: config.apiKey, timeout: config.timeoutMs, maxRetries: 1 }) : null);
   }
   private async structured<T extends z.ZodType>(schema: T, name: string, instructions: string, input: OpenAI.Responses.ResponseInput, maxTokens: number, signal?: AbortSignal): Promise<z.infer<T>> {
     if (!this.client) throw new AppError(503, 'AI_NOT_CONFIGURED', 'Backend chưa được cấu hình OpenAI API Key. Hãy thêm khóa trong backend/.env rồi khởi động lại backend.');
     try {
-      const result = await this.client.responses.parse({
+      const body = {
         model: this.config.model,
         store: false,
         instructions: `${SAFETY_INSTRUCTIONS}\n${instructions}`,
         input,
         max_output_tokens: maxTokens,
         text: { format: zodTextFormat(schema, name) },
-      }, { signal });
+      };
+      let result;
+      try {
+        result = await this.client.responses.parse({ ...body, ...(this.temperatureSupported ? { temperature: 0 } : {}) }, { signal });
+      } catch (error) {
+        // Retry only an explicit unsupported sampling parameter, not unrelated
+        // input/auth/quota/network errors. Reasoning models may omit temperature.
+        if (error instanceof OpenAI.APIError && error.status === 400 && error.param === 'temperature' &&
+          (error.code === 'unsupported_parameter' || error.code === 'unsupported_value')) {
+          this.temperatureSupported = false;
+          result = await this.client.responses.parse(body, { signal });
+        } else throw error;
+      }
       if (result.status === 'incomplete') throw new AppError(502, 'AI_INCOMPLETE', 'AI chưa trả về toàn bộ kết quả. Thử lại hoặc chia hợp đồng thành các phần nhỏ hơn; không có kết quả bị cắt được sử dụng.');
       if (result.output.some(item => item.type === 'message' && item.content.some(content => content.type === 'refusal'))) throw new AppError(422, 'AI_REFUSED', 'AI không thể xử lý nội dung này. Kiểm tra ảnh hợp đồng và thử lại.');
       if (!result.output_parsed) throw new AppError(502, 'AI_INVALID_RESPONSE', 'AI không trả về dữ liệu đúng cấu trúc. Vui lòng thử lại.');
@@ -56,8 +69,9 @@ export class OpenAIService implements StructuredAI {
   }
   analyze(pages: ExtractedPage[], signal?: AbortSignal) {
     return this.structured(CandidateAnalysisSchema, 'contract_analysis',
-      `Rà soát TOÀN BỘ các trang với danh sách quy tắc: ${JSON.stringify(CONTRACT_RULES)}. ${SEVERITY_RUBRIC}
-Không giới hạn cố định số phát hiện; liệt kê tất cả vấn đề có căn cứ, không lặp cùng một vấn đề. Mỗi findings phải có ít nhất một bằng chứng nguyên văn từ page.text; nếu mâu thuẫn giữa các trang thì trích cả hai. ruleId chọn theo nhóm phù hợp. reason giải thích mức ưu tiên; explanation diễn giải ngắn, không thêm sự kiện; suggestedQuestion là câu hỏi cụ thể để hỏi chủ nhà, mọi tiền đề cụ thể trong câu hỏi phải có trong evidence. Không đưa mục thiếu bằng chứng vào findings. Không khẳng định chắc chắn tài liệu không quy định chỉ vì chưa tìm thấy. title mỗi phát hiện ngắn gọn bằng tiếng Việt. Các trang partial/unreadable giới hạn kết luận.`,
+      `Rà soát TOÀN BỘ các trang theo TỪNG mã kiểm tra cố định: ${JSON.stringify(CONTRACT_CHECKS)}.
+Phải kiểm tra từng mã theo đúng thứ tự và trả reviewedChecks chứa MỖI mã đúng một lần, kể cả không phát hiện vấn đề. findings chỉ chứa vấn đề có căn cứ, gắn checkId phù hợp nhất; không lặp cùng một vấn đề. Không tự chọn hay đổi mức ưu tiên: backend lấy mức từ checkId. reason giải thích tác động cụ thể theo định nghĩa mã.
+Không giới hạn cố định số phát hiện; một mã có thể có nhiều vấn đề ở các điều khoản khác nhau. Mỗi finding phải có bằng chứng nguyên văn từ page.text; nếu mâu thuẫn phải trích cả hai. explanation ngắn, không thêm sự kiện; suggestedQuestion là câu hỏi cụ thể để hỏi chủ nhà, mọi tiền đề cụ thể phải có trong evidence. Không đưa mục thiếu bằng chứng vào findings. Không khẳng định chắc chắn tài liệu không quy định chỉ vì chưa tìm thấy. title ngắn bằng tiếng Việt. Trang partial/unreadable giới hạn kết luận.`,
       [{ role: 'user', content: JSON.stringify({ contractPages: pages }) }], 14000, signal);
   }
   review(claims: ClaimToReview[], pages: ExtractedPage[], signal?: AbortSignal) {

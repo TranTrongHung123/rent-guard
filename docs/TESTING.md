@@ -8,14 +8,14 @@ Ngày kiểm tra: **14/11/2026** (Asia/Saigon). Môi trường: Windows, Node.js
 | --- | --- |
 | Mobile `npm run typecheck` | Đạt, TypeScript strict, không có lỗi |
 | Mobile `npm run lint` | Đạt, không lỗi/cảnh báo ESLint |
-| Mobile `npm test` | **49/49 đạt**, không gọi OpenAI; gồm13 kiểm tra tương phản và3 regression tests lỗi mạng SDK58 |
+| Mobile `npm test` | **57/57 đạt**, không gọi OpenAI; gồm giữ ảnh/báo cáo khi đọc lại/hủy, provenance, fingerprint, metadata/lịch sử cũ,13 kiểm tra tương phản và lỗi mạng SDK58 |
 | Mobile `npm run check:contracts` | Đạt, types Mobile khớp shared chuẩn |
 | `npx expo-doctor` | **20/20 đạt**, dependencies/config tương thích SDK58 |
 | `npx expo export --platform all` | Đạt, Hermes bundle Android/iOS và static web với đầy đủ9 routes |
 | Backend `npm run typecheck` | Đạt |
-| Backend `npm test` | **21/21 đạt**, không gọi OpenAI thật |
+| Backend `npm test` | **34/34 đạt**, không gọi OpenAI thật; gồm cache, checklist, mức cố định, chữ ký, sampling fallback và hủy đồng thời |
 | Backend `npm run build` | Đạt, tạo Node output chạy được |
-| Backend chạy thực tế | `GET /api/health`:200, `aiConfigured:false`; phân tích khi chưa có khóa:503 rõ ràng |
+| Backend chạy thực tế | Bản build v2 khởi động cổng loopback tạm và health200, `aiConfigured:true`, model cục bộ được giữ nguyên; không gọi OpenAI. Server kiểm thử đã đóng |
 | Dependency tree | Không lỗi missing/invalid trong `npm ls`; Expo SDK không bị nâng/hạ |
 | EAS | **FINISHED / BUILD SUCCESSFUL**, APK preview internal trên `@trantronghung/rentguard` |
 | Archive EAS cục bộ | Có types, state, helper đường dẫn và ảnh mẫu JPEG; không có `.env`/khóa và không có file artifact kiểm thử được đưa vào archive |
@@ -30,13 +30,17 @@ Backend `npm audit --omit=dev`: **0 vulnerabilities**. Mobile `npm audit`: **8 m
 
 ## Phần chưa xác nhận thực tế
 
+Cập nhật ổn định `rentguard-v2.0.0`: test xác nhận ảnh trùng nhưng picker ID mới chỉ OCR/phân tích một lần; ảnh mới có text trùng/khoảng trắng khác dùng lại đúng quote/offset; số tiền đổi và partial OCR phân tích mới; history ký dùng lại sau tạo service mới; sửa mức trong history bị403; đổi model/secret không dùng lại; `forceRefresh` không gộp với luồng dùng cache. Kiểm tra TTL/LRU/giới hạn byte/clone, mã checklist thiếu/lặp, loại trùng và ưu tiên theo code, hủy một/tất cả subscriber, lỗi không cache, temperature không được hỗ trợ và lỗi khác không retry. Đây là test fixture, **chưa đo độ lặp lại thực tế của OpenAI trên ảnh chụp hợp đồng**. Để nghiệm thu: phân tích/lưu một hợp đồng mới, chọn lại ảnh, chụp lại, sửa một số tiền và dùng Đọc lại từ ảnh; đối chiếu thông tin nguồn kết quả, số mục/mức và ảnh trích dẫn.
+
 Cập nhật giao diện xanh dương: đã tối ưu toàn bộ màn hình theo [UI_UX.md](UI_UX.md), thêm13 test tương phản palette; tổng Mobile49 tests. Lint, TypeScript, đồng bộ shared types, Expo Doctor20/20 và export Hermes Android/iOS/static web đạt. Bundle mới ở `mobile/test-results/blue-ui-export`. Bộ test này không thay thế thao tác visual/native trên thiết bị; cấu hình SDK58 được giữ nguyên.
+
+Sau pipeline v2, đã chạy lại lint, TypeScript, shared types, Expo Doctor20/20, dependency tree và export Android/iOS/web với `expo-crypto` phiên bản58.0.8. Bundle mới nhất tại `mobile/test-results/stability-export`. Hai test provider dùng hooks/Expo/storage fixture xác nhận lệnh đọc lại giữ báo cáo/ảnh nháp và hủy an toàn; không phải test render native.
 
 Cập nhật từ thử nghiệm iPhone ngày14/11/2026: ảnh người dùng cung cấp cho thấy Safari nhận health200 và app hiển thị2 trang đã chọn, nhưng phân tích báo lỗi kết nối. Kiểm tra lại từ laptop cũng nhận200 qua loopback và IP LAN. Chưa xác nhận URL đã lưu/quyền mạng của Expo Go hoặc một lần phân tích thành công trên điện thoại. `aiConfigured:true` vẫn chỉ là có cấu hình khóa.
 
 Đã tái hiện lỗi wrapper để lọt `FetchError extends Error` của SDK58 (chỉ bắt TypeError trước đây), sửa để bắt lỗi tại chính fetch, thông báo URL đang gọi và hướng dẫn LAN/quyền iPhone.36 tests đạt, gồm native FetchError, localhost/IPv6 loopback và lỗi khác realm; HTTP, JSON, timeout và hủy vẫn tách biệt. Chưa đổi fetch stack, cấu hình khóa hay model. Sửa thông báo không tự cấp quyền hoặc thay URL đã lưu. Bản APK ở cuối tài liệu được tạo trước sửa JavaScript này; Expo Go dùng source hiện tại sau khi reload.
 
-- **OpenAI thật:** chưa có API Key. Chưa đo độ chính xác OCR, phát hiện điều khoản, độ trễ/chi phí hoặc hỏi đáp trên hợp đồng thật. Không coi test fixture hay `aiConfigured:true` là bằng chứng kết nối thực.
+- **OpenAI thật:** đã có cấu hình khóa cục bộ; chưa chạy kiểm thử hợp đồng thật trong đợt tối ưu này. Chưa đo độ chính xác OCR, độ lặp lại, độ trễ/chi phí hoặc hỏi đáp thực tế. Không coi test fixture hay `aiConfigured:true` là bằng chứng kết nối thực.
 - **Android/iOS thật:** chưa có thiết bị/emulator/ADB kết nối trong phiên này. Chưa xác nhận quyền camera/thư viện, keyboard, notch, phóng to, khởi động lại app, cập nhật iOS container hoặc độ ổn định bộ nhớ trên thiết bị thật.
 - **Visual browser:** môi trường Computer Use không cung cấp browser/app để thao tác. Metro/web export thành công không thay thế kiểm tra giao diện trực quan.
 - **Tính đúng nghiệp vụ/pháp lý:** kiểm chứng trích dẫn không chứng minh OCR đọc đúng ảnh hoặc model không bỏ sót/không suy luận sai. Chưa có thẩm định pháp lý hay bộ benchmark tài liệu thực.
@@ -59,6 +63,7 @@ Kiểm thử kết nối opt-in (có phí) ở Backend: `npm run test:live -- <�
 Build Android cloud: [42b6af69-42fb-40c5-9092-878d740cf7ff](https://expo.dev/accounts/trantronghung/projects/rentguard/builds/42b6af69-42fb-40c5-9092-878d740cf7ff), **FINISHED** lúc **13:25:57 ngày14/11/2026** (Asia/Saigon). Gradle `BUILD SUCCESSFUL`, `assembleRelease` và upload artifact hoàn tất.
 
 - [Tải APK](https://expo.dev/artifacts/eas/7pSWZBMVKaWP42iSv1P6KJ8hdpGl5EQENy6hxV4ko4c.apk); bản local: `artifacts/RentGuard-preview.apk`.
+- APK này được tạo trước giao diện xanh dương và pipeline ổn định v2. Expo Go dùng source mới sau reload; muốn cập nhật APK cần build lại profile preview.
 - Android package `vn.rentguard.app`, version1.0.0, versionCode1, SDK58, profile preview, distribution internal.
 - Dung lượng: **102.689.192 bytes**, khoảng97,93 MiB.
 - SHA-256: `a44e1f786c073c5cd4dd2bf4b074530c9be35861a955b4a8243ccad7c1579ee6`.

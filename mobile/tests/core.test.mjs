@@ -57,6 +57,24 @@ test('accepts a complete record and repeated references to the same verified evi
   assert.equal(validateSavedRecord(demo), true);
 });
 
+test('new analysis metadata is validated while legacy history remains readable', () => {
+  const metadata = { version: 'rentguard-v2.0.0', policyId: 'a'.repeat(64), inputFingerprint: 'b'.repeat(64), analyzedAt: '2026-11-14T00:00:00.000Z', reuse: 'text' };
+  const record = sampleRecord(); record.report.analysis = metadata; record.report.findings[0].checkId = 'DEPOSIT_REFUND';
+  assert.equal(validateSavedRecord(record), true);
+  for (const change of [
+    analysis => { analysis.reuse = 'pretend-fresh'; },
+    analysis => { analysis.inputFingerprint = 'not-a-hash'; },
+    analysis => { analysis.policyId = 'short'; },
+    analysis => { analysis.analyzedAt = 'invalid'; },
+    analysis => { analysis.version = ''; },
+  ]) {
+    const broken = sampleRecord(); broken.report.analysis = structuredClone(metadata); change(broken.report.analysis);
+    assert.equal(validateSavedRecord(broken), false);
+  }
+  record.report.analysis = null; assert.equal(validateSavedRecord(record), false);
+  delete record.report.analysis; assert.equal(validateSavedRecord(record), true);
+});
+
 test('a source quote must match the extracted text and offsets exactly', () => {
   for (const change of [
     evidence => { evidence.quote = 'được hoàn trong 3 ngày'; },

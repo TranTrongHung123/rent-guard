@@ -50,7 +50,8 @@ test('missing or duplicate semantic reviews never accept a finding', async () =>
 });
 test('analysis preserves all supported findings without a small display-driven result cap', async () => {
   const ai = new FakeAI();
-  ai.analysis.findings = Array.from({ length: 42 }, (_, index) => ({ ...ai.analysis.findings[0]!, title: `Điểm cần làm rõ số ${index + 1}` }));
+  ai.analysis.findings = Array.from({ length: 42 }, (_, index) => ({ ...ai.analysis.findings[0]!, title: `Điểm cần làm rõ số ${index + 1}`, evidence: [{ pageId: 'page-1', quote: `Điều ${index + 1}: Không hoàn cọc khi bên thuê trả nhà trước hạn.` }] }));
+  ai.extract = async () => ({ status: 'readable', text: ai.analysis.findings.map(f => f.evidence[0]!.quote).join('\n'), warning: null });
   const result = await request(createApp(config, ai)).post('/api/analyses').send({ pages: [{ id: 'page-1', dataUrl: png }] }).expect(200);
   assert.equal(result.body.report.findings.length, 42);
 });

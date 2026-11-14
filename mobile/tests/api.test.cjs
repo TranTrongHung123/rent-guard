@@ -119,6 +119,15 @@ test('chat keeps previous turns and the current question separate without droppi
   assert.equal(result.message.content, 'Chưa có thời hạn hoàn cọc trong hợp đồng.');
 });
 
+test('analysis options preserve the signed snapshot and explicitly request a fresh run', async (t) => {
+  let received;
+  const baseUrl = await fixtureServer(t, async (request, response) => { received = await bodyOf(request); json(response, 200, { report: { id: 'new' }, analysisToken: 'new-signature' }); });
+  const previousAnalysis = { report: { id: 'old', analysis: { reuse: 'text' } }, analysisToken: 'signed-history' };
+  await client().analyzePages(baseUrl, [{ id: 'a', dataUrl: 'fixture' }], new AbortController().signal, { previousAnalysis, forceRefresh: true });
+  assert.equal(received.forceRefresh, true);
+  assert.deepEqual(received.previousAnalysis, previousAnalysis);
+});
+
 test('a structured missing-key error reaches the user and never becomes demo output', async (t) => {
   let requestCount = 0;
   const baseUrl = await fixtureServer(t, (request, response) => {

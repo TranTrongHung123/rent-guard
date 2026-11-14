@@ -1,4 +1,4 @@
-import type { AnalyzeResponse, ApiError, ChatRequest, ChatResponse, HealthResponse } from '@/types';
+import type { AnalyzeRequest, AnalyzeResponse, ApiError, ChatRequest, ChatResponse, HealthResponse } from '@/types';
 import { normalizeApiUrl } from '@/domain/core';
 
 export async function request<T>(baseUrl: string, path: string, body?: unknown, options: { signal?: AbortSignal; timeout?: number } = {}): Promise<T> {
@@ -46,6 +46,6 @@ export async function request<T>(baseUrl: string, path: string, body?: unknown, 
 }
 
 export const health = (url: string) => request<HealthResponse>(url, '/api/health');
-export const analyzePages = (url: string, pages: { id: string; dataUrl: string }[], signal: AbortSignal) =>
-  request<AnalyzeResponse>(url, '/api/analyses', { pages }, { signal, timeout: 600000 });
+export const analyzePages = (url: string, pages: { id: string; dataUrl: string }[], signal: AbortSignal, options: Omit<AnalyzeRequest, 'pages'> = {}) =>
+  request<AnalyzeResponse>(url, '/api/analyses', { pages, ...options }, { signal, timeout: 600000 });
 export const askContract = (url: string, body: ChatRequest) => request<ChatResponse>(url, '/api/chat', body, { timeout: 240000 });

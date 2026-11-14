@@ -5,12 +5,104 @@ import type { StructuredAI } from './ai.js';
 import { AppError } from './errors.js';
 import { containsLegalVerdict, validateFindings, verifyEvidence } from './evidence.js';
 import { signReport, verifyReport } from './signing.js';
-import { CONTRACT_RULES, RULE_CLARIFICATIONS } from './rules.js';
+import { CONTRACT_CHECKS, CONTRACT_RULES, RULE_CLARIFICATIONS } from './rules.js';
+import { ANALYSIS_VERSION, analysisPolicyId, inputFingerprint, ReportCache, SingleFlight, textFingerprint } from './stability.js';
+
+type Reuse = NonNullable<AnalysisReport['analysis']>['reuse'];
 
 export class ContractService {
-  constructor(private config: Config, private ai: StructuredAI) {}
+  private imageCache: ReportCache;
+  private textCache: ReportCache;
+  private imageFlights = new SingleFlight<{ report: AnalysisReport; reuse: Reuse }>();
+  private textFlights = new SingleFlight<AnalysisReport>();
+  private policyId: string;
+  constructor(private config: Config, private ai: StructuredAI) {
+    this.imageCache = new ReportCache(config.analysisCacheTtlMs ?? 1800000, config.analysisCacheEntries ?? 32);
+    this.textCache = new ReportCache(config.analysisCacheTtlMs ?? 1800000, config.analysisCacheEntries ?? 32);
+    this.policyId = analysisPolicyId(config);
+  }
 
   async analyze(request: AnalyzeRequest, signal?: AbortSignal): Promise<AnalyzeResponse> {
+    if (signal?.aborted) throw new AppError(499, 'REQUEST_CANCELLED', 'Yêu cầu đã được hủy.');
+    const fingerprint = inputFingerprint(request.pages);
+    const imageKey = `${this.policyId}:${fingerprint}`;
+    let previous: AnalysisReport | undefined;
+    if (!request.forceRefresh && request.previousAnalysis?.report.analysis?.policyId === this.policyId) {
+      const supplied = request.previousAnalysis;
+      if (supplied.report.source !== 'openai' || !verifyReport(supplied.report, supplied.analysisToken, this.config.signingSecret)) {
+        throw new AppError(403, 'INVALID_ANALYSIS', 'Báo cáo đã lưu không được xác thực. Hãy dùng Đọc lại từ ảnh để tạo phân tích mới.');
+      }
+      if (supplied.report.model === this.config.model && supplied.report.analysis?.version === ANALYSIS_VERSION && supplied.report.pages.length === request.pages.length) {
+        previous = this.canonicalReport(supplied.report);
+      }
+    }
+    let result: { report: AnalysisReport; reuse: Reuse } | undefined;
+    if (!request.forceRefresh) {
+      const cached = this.imageCache.get(imageKey);
+      if (cached) result = { report: cached, reuse: 'images' };
+      else if (previous && request.previousAnalysis!.report.analysis!.inputFingerprint === fingerprint) {
+        this.imageCache.set(imageKey, previous);
+        const textHash = textFingerprint(previous.pages);
+        if (textHash) this.textCache.set(`${this.policyId}:${textHash}`, previous);
+        result = { report: previous, reuse: 'saved' };
+      }
+    }
+    if (!result) result = await this.imageFlights.run(`${imageKey}:${request.forceRefresh ? 'fresh' : 'reuse'}`, async jobSignal => {
+      // Canonical page IDs make the model input independent of picker-generated IDs.
+      const canonicalRequest = { pages: request.pages.map((page, index) => ({ id: `page-${index + 1}`, dataUrl: page.dataUrl })) };
+      const pages = await this.extractPages(canonicalRequest, jobSignal);
+      const textHash = textFingerprint(pages);
+      const textKey = textHash ? `${this.policyId}:${textHash}` : null;
+      let report: AnalysisReport | undefined;
+      let reuse: Reuse = 'none';
+      if (!request.forceRefresh && textKey) {
+        const known = this.textCache.get(textKey) ?? (previous && textFingerprint(previous.pages) === textHash ? previous : undefined);
+        if (known) { report = this.withPages(known, pages) ?? undefined; if (report) reuse = 'text'; }
+      }
+      if (!report) {
+        report = textKey && !request.forceRefresh
+          ? await this.textFlights.run(textKey, sharedSignal => this.analyzeText(pages, sharedSignal), jobSignal)
+          : await this.analyzeText(pages, jobSignal);
+        // Concurrent equivalent OCR can have different whitespace/offsets.
+        const rebound = this.withPages(report, pages);
+        if (!rebound) throw new AppError(502, 'AI_INVALID_RESPONSE', 'Không đối chiếu được bằng chứng với các trang hiện tại. Hãy thử lại.');
+        report = rebound;
+      }
+      if (jobSignal.aborted) throw new AppError(499, 'REQUEST_CANCELLED', 'Yêu cầu đã được hủy.');
+      this.imageCache.set(imageKey, report);
+      if (textKey) this.textCache.set(textKey, report);
+      return { report, reuse };
+    }, signal);
+    const report = this.withPages(result.report, result.report.pages.map((page, index) => ({ ...page, id: request.pages[index]!.id })));
+    if (!report) throw new AppError(502, 'AI_INVALID_RESPONSE', 'Bằng chứng không khớp bộ trang hợp đồng.');
+    report.id = randomUUID();
+    report.analysis = { version: ANALYSIS_VERSION, policyId: this.policyId, inputFingerprint: fingerprint, analyzedAt: report.createdAt, reuse: result.reuse };
+    return { report, analysisToken: signReport(report, this.config.signingSecret) };
+  }
+
+  private canonicalReport(input: AnalysisReport): AnalysisReport {
+    const report = structuredClone(input);
+    delete report.analysis;
+    return this.withPages(report, report.pages.map((page, index) => ({ ...page, id: `page-${index + 1}` })))!;
+  }
+
+  /** Never borrow offsets from a different OCR pass or point at an old image ID. */
+  private withPages(template: AnalysisReport, pages: ExtractedPage[]): AnalysisReport | null {
+    if (pages.length !== template.pages.length) return null;
+    const report = structuredClone(template);
+    report.pages = structuredClone(pages);
+    for (const finding of report.findings) {
+      const evidence = finding.evidence.map(item => {
+        const page = pages[item.pageNumber - 1];
+        return page ? verifyEvidence({ pageId: page.id, quote: item.quote }, pages) : null;
+      });
+      if (evidence.some(item => !item)) return null;
+      finding.evidence = evidence as Evidence[];
+    }
+    return report;
+  }
+
+  private async extractPages(request: AnalyzeRequest, signal?: AbortSignal): Promise<ExtractedPage[]> {
     // Bounded concurrency preserves input order and avoids bursty API quota use.
     const pages: ExtractedPage[] = new Array(request.pages.length);
     let next = 0;
@@ -22,6 +114,7 @@ export class ContractService {
         if (extractionSignal.aborted) throw new AppError(499, 'REQUEST_CANCELLED', 'Yêu cầu đã được hủy.');
         const input = request.pages[index]!;
         const extracted = await this.ai.extract(input, index + 1, extractionSignal);
+        if (extractionSignal.aborted) throw new AppError(499, 'REQUEST_CANCELLED', 'Yêu cầu đã được hủy.');
         const text = extracted.status === 'unreadable' ? '' : extracted.text;
         const status = text.trim() ? extracted.status : 'unreadable';
         pages[index] = { id: input.id, pageNumber: index + 1, status, text, warning: extracted.warning || (status !== 'readable' ? 'Không đọc được đầy đủ trang này. Hãy đối chiếu ảnh gốc hoặc chụp lại.' : null) };
@@ -29,7 +122,15 @@ export class ContractService {
     })); } catch (error) { extractionController.abort(); throw error; }
     if (pages.every(p => p.status === 'unreadable')) throw new AppError(422, 'UNREADABLE_IMAGES', 'Không đọc được nội dung hợp đồng trong các ảnh. Hãy chụp rõ chữ, đủ sáng, đủ bốn góc trang rồi thử lại.');
     if (pages.reduce((sum, page) => sum + page.text.length, 0) > 200000) throw new AppError(422, 'CONTRACT_TOO_LONG', 'Hợp đồng vượt dung lượng một lần phân tích. Chia thành các phần nhỏ hơn và xem xét các giới hạn khi đối chiếu.');
+    return pages;
+  }
+
+  private async analyzeText(pages: ExtractedPage[], signal?: AbortSignal): Promise<AnalysisReport> {
     const raw = await this.ai.analyze(pages, signal);
+    if (raw.reviewedChecks.length !== CONTRACT_CHECKS.length || new Set(raw.reviewedChecks).size !== CONTRACT_CHECKS.length ||
+      CONTRACT_CHECKS.some(check => !raw.reviewedChecks.includes(check.id))) {
+      throw new AppError(502, 'AI_INCOMPLETE_CHECKLIST', 'AI chưa rà soát đủ danh sách kiểm tra. Không sử dụng kết quả thiếu mục; hãy thử lại.');
+    }
     const validated = validateFindings(raw, pages);
     const reviews = validated.findings.length ? await this.ai.review(validated.findings.map(f => ({ id: f.id, text: `Nhóm ${f.ruleId}; mức ưu tiên ${f.severity}\n${f.title}\n${f.reason}\n${f.explanation}\nCâu hỏi gợi ý: ${f.suggestedQuestion}`, evidence: f.evidence })), pages, signal) : { reviews: [] };
     // Missing/duplicate review IDs fail closed.
@@ -53,7 +154,7 @@ export class ContractService {
         ...CONTRACT_RULES.filter(rule => !findings.some(finding => finding.ruleId === rule.id)).map(rule => RULE_CLARIFICATIONS[rule.id]!),
       ], warnings,
     };
-    return { report, analysisToken: signReport(report, this.config.signingSecret) };
+    return report;
   }
 
   async chat(request: ChatRequest, signal?: AbortSignal): Promise<ChatResponse> {

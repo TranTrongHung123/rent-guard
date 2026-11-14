@@ -67,6 +67,8 @@ Kết quả build và phạm vi kiểm thử thực tế xem [docs/TESTING.md](d
 
 ## Source và kiểm tra
 
+Phân tích v2 rà soát16 mã vấn đề; Backend gán mức ưu tiên cố định theo mã và loại trùng theo bằng chứng. Ảnh trùng hoặc ảnh mới có toàn bộ văn bản đọc được trùng khớp có thể dùng lại kết quả đã kiểm chứng (cache RAM/historical report ký). Báo cáo hiển thị nguồn kết quả và ngày phân tích gốc. **Đọc lại từ ảnh** gọi OpenAI mới, giữ nguyên báo cáo trước; AI/OCR vẫn có thể khác khi đọc lại hoặc đầu vào thay đổi. Khởi động lại Backend và reload Expo Go để dùng phiên bản mới, phân tích mới một lần để có metadata v2 rồi lưu báo cáo. Cấu hình cache là tùy chọn; không cần đổi API Key hoặc model hiện tại. Chi tiết: [thiết kế AI](docs/AI_DESIGN.md#dùng-lại-kết-quả-đã-kiểm-chứng).
+
 ```text
 mobile/src/app/          Expo Router: trang chủ, ảnh, báo cáo, bằng chứng, chat, lịch sử, kết nối
 mobile/src/ui/           thành phần giao diện và màu dùng chung

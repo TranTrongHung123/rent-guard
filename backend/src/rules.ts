@@ -11,6 +11,27 @@ export const CONTRACT_RULES: ContractRule[] = [
   { id: 'OTHER', category: 'other', title: 'Nội dung đáng chú ý khác', checks: 'Quyền ra vào, riêng tư, tài sản, người ký/quyền cho thuê, phụ lục, điều khoản mâu thuẫn hoặc không rõ, hạn chế sử dụng nhà.' },
 ];
 export const SEVERITY_ORDER: Record<Severity, number> = { high: 0, medium: 1, low: 2 };
+
+// Stable product priorities for a supported issue; these are not legal thresholds.
+export const CONTRACT_CHECKS = [
+  { id: 'DEPOSIT_FORFEITURE', ruleId: 'DEPOSIT', severity: 'high', checks: 'Điều kiện mất/giữ toàn bộ cọc, khấu trừ không giới hạn hoặc không có ngoại lệ rõ ràng.' },
+  { id: 'DEPOSIT_REFUND', ruleId: 'DEPOSIT', severity: 'medium', checks: 'Cách, thời hạn hoặc điều kiện hoàn cọc/biên nhận trong hợp đồng còn mơ hồ. Không suy ra thiếu chỉ từ việc không tìm thấy.' },
+  { id: 'DEPOSIT_CONFLICT', ruleId: 'DEPOSIT', severity: 'high', checks: 'Số tiền hoặc nghĩa vụ tiền cọc mâu thuẫn giữa các điều khoản; trích cả hai.' },
+  { id: 'RENT_UNILATERAL', ruleId: 'RENT', severity: 'high', checks: 'Quyền tự tăng/thay đổi giá thuê không có giới hạn hoặc không báo trước.' },
+  { id: 'RENT_PAYMENT', ruleId: 'RENT', severity: 'medium', checks: 'Kỳ thanh toán, cách thanh toán hoặc phạt chậm trả còn bất lợi/chưa rõ theo điều khoản được trích.' },
+  { id: 'RENT_CONFLICT', ruleId: 'RENT', severity: 'high', checks: 'Giá thuê hoặc thời hạn thanh toán mâu thuẫn giữa các đoạn; trích cả hai.' },
+  { id: 'FEES_UNSPECIFIED', ruleId: 'FEES', severity: 'medium', checks: 'Điều khoản cho phép thu phí chưa liệt kê/chưa xác định hoặc cách tính phí mơ hồ.' },
+  { id: 'FEES_CHANGE', ruleId: 'FEES', severity: 'medium', checks: 'Quyền thay đổi đơn giá điện, nước hoặc dịch vụ không có cơ chế thỏa thuận rõ.' },
+  { id: 'TERMINATION_UNILATERAL', ruleId: 'TERMINATION', severity: 'high', checks: 'Quyền chấm dứt/thu hồi nhà đột ngột hoặc một phía theo điều khoản.' },
+  { id: 'TERMINATION_NOTICE', ruleId: 'TERMINATION', severity: 'medium', checks: 'Thông báo, gia hạn hoặc bàn giao khi kết thúc hợp đồng còn mơ hồ/bất cân xứng.' },
+  { id: 'TERMINATION_COMPENSATION', ruleId: 'TERMINATION', severity: 'high', checks: 'Nghĩa vụ bồi thường/phạt chấm dứt sớm đáng chú ý. Nếu chỉ mất cọc, dùng DEPOSIT_FORFEITURE để tránh lặp.' },
+  { id: 'REPAIRS_UNLIMITED', ruleId: 'REPAIRS', severity: 'high', checks: 'Người thuê chịu mọi sửa chữa, kể cả hao mòn tự nhiên/lỗi có sẵn, hoặc trách nhiệm thiệt hại không giới hạn.' },
+  { id: 'REPAIRS_ALLOCATION', ruleId: 'REPAIRS', severity: 'medium', checks: 'Phân chia sửa chữa, thiết bị hoặc chứng minh hiện trạng bàn giao còn không rõ theo nội dung được trích.' },
+  { id: 'OTHER_ACCESS', ruleId: 'OTHER', severity: 'high', checks: 'Quyền tự vào nhà, xử lý/giữ tài sản hoặc hạn chế riêng tư đáng chú ý theo điều khoản.' },
+  { id: 'OTHER_CONFLICT', ruleId: 'OTHER', severity: 'high', checks: 'Mâu thuẫn về nghĩa vụ/quyền sử dụng quan trọng chưa thuộc nhóm trên; trích các đoạn mâu thuẫn.' },
+  { id: 'OTHER_CLARIFICATION', ruleId: 'OTHER', severity: 'low', checks: 'Thủ tục, phụ lục, thông tin hoặc chi tiết khác cần xác nhận, có bằng chứng, chưa thuộc mã khác.' },
+] as const;
+export const CHECK_IDS = CONTRACT_CHECKS.map(check => check.id) as [typeof CONTRACT_CHECKS[number]['id'], ...typeof CONTRACT_CHECKS[number]['id'][]];
 /** Neutral checklist questions; absence of a verified finding is not proof of absence of a clause. */
 export const RULE_CLARIFICATIONS: Record<string, string> = {
   DEPOSIT: 'Bạn đã đối chiếu rõ số tiền cọc, điều kiện khấu trừ và thời hạn hoàn cọc với chủ nhà chưa?',

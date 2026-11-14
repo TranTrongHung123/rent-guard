@@ -5,7 +5,7 @@ Tài liệu này mô tả **code thực tế** ở `backend/src/`, không mô t�
 ## Luồng xử lý nhiều trang
 
 1. `app.ts` kiểm tra số trang, ID duy nhất, MIME/chữ ký JPEG/PNG/WebP, dung lượng từng ảnh và tổng dung lượng. Thứ tự mảng ảnh là thứ tự trang người dùng đã sắp xếp.
-2. `ai.ts` gọi **OpenAI Responses API Vision** cho từng trang với `detail: "high"`, `store: false`, schema `ExtractedSchema` và `zodTextFormat`. `service.ts` giới hạn ba trang xử lý đồng thời nhưng đặt kết quả vào đúng chỉ số ban đầu.
+2. Khi không có báo cáo ảnh trùng được xác thực để dùng lại, `ai.ts` gọi **OpenAI Responses API Vision** cho từng trang với `detail: "high"`, `store: false`, schema `ExtractedSchema` và `zodTextFormat`. `service.ts` giới hạn ba trang xử lý đồng thời nhưng đặt kết quả vào đúng chỉ số ban đầu.
 3. Mỗi trang trả `readable`, `partial` hoặc `unreadable`, văn bản và cảnh báo. Không sửa hoặc đoán chỗ chữ mờ. Trang `unreadable` có text rỗng. Trang mờ vẫn xuất hiện trong báo cáo; nếu tất cả trang không đọc được trả lỗi `UNREADABLE_IMAGES`. Một lời gọi OCR thất bại làm hủy luồng, không âm thầm bỏ trang.
 4. **Toàn bộ** các trang được gửi cùng nhau cho bước phân tích. Model nhận danh sách quy tắc, thang mức ưu tiên và các ràng buộc chống bịa. Điều khoản mâu thuẫn giữa hai trang cần trích cả hai.
 5. Backend xác thực JSON, kiểm tra trích dẫn bằng code, sau đó gọi một lượt model riêng để kiểm tra ngữ nghĩa. Chỉ các phát hiện qua cả hai lớp được hiển thị. Kết quả cuối cùng được ký để hỏi đáp sau này.
@@ -31,7 +31,29 @@ Quy tắc nằm trong `backend/src/rules.ts`. Đây là checklist hướng dẫn
 | `medium` | Trung bình | Nghĩa vụ, chi phí hoặc cách thực hiện chưa rõ, cần làm rõ/thương lượng |
 | `low` | Thấp | Chi tiết hoặc thủ tục cần xác nhận |
 
-Mức ưu tiên do AI đề xuất theo rubric trên, được lượt kiểm tra ngữ nghĩa rà lại và code sắp Cao → Trung bình → Thấp. Không tự gắn một số tháng tiền cọc hoặc một mức giá vào ngưỡng “bất hợp pháp”. Lý do phải bám điều khoản. Các cụm khẳng định pháp lý dứt khoát phổ biến còn bị bộ lọc bổ sung loại bỏ; bộ lọc không phải bằng chứng rằng mọi cách diễn đạt pháp lý đều đã được nhận diện.
+Từ `rentguard-v2.0.0`, **code quyết định mức ưu tiên theo `checkId`**, AI chỉ xác định vấn đề và mã phù hợp với bằng chứng. Mỗi phản hồi phải xác nhận đủ 16 mã trong `reviewedChecks`, không thiếu/lặp. Mỗi mã có thể có nhiều phát hiện ở các điều khoản khác nhau; không ép tổng số phát hiện. Cùng mã và vị trí bằng chứng chỉ tính một mục, dù tiêu đề thay đổi. ID được tạo từ mã/vị trí, thứ tự ổn định theo mức → mã → trang → vị trí. Không tự gắn một số tháng tiền cọc hoặc một mức giá vào ngưỡng “bất hợp pháp”. Lý do phải bám điều khoản. Lượt kiểm chứng ngữ nghĩa vẫn loại nhận định không được hỗ trợ.
+
+| Mức cố định | Các `checkId` |
+| --- | --- |
+| Cao | `DEPOSIT_FORFEITURE`, `DEPOSIT_CONFLICT`, `RENT_UNILATERAL`, `RENT_CONFLICT`, `TERMINATION_UNILATERAL`, `TERMINATION_COMPENSATION`, `REPAIRS_UNLIMITED`, `OTHER_ACCESS`, `OTHER_CONFLICT` |
+| Trung bình | `DEPOSIT_REFUND`, `RENT_PAYMENT`, `FEES_UNSPECIFIED`, `FEES_CHANGE`, `TERMINATION_NOTICE`, `REPAIRS_ALLOCATION` |
+| Thấp | `OTHER_CLARIFICATION` |
+
+Định nghĩa đầy đủ nằm tại `CONTRACT_CHECKS` trong `rules.ts`. Không tính lại mức báo cáo lịch sử, vì thay đổi sẽ làm sai chữ ký và mất khả năng đối chiếu bản gốc.
+
+## Dùng lại kết quả đã kiểm chứng
+
+`stability.ts` quản lý hai lớp cache TTL/LRU trong RAM (mặc định 30 phút, mỗi lớp tối đa 32 báo cáo/8 MiB). SHA-256 ảnh tính từ JSON mảng data URL theo thứ tự, loại ID do picker tạo. Mọi request AI dùng ID trang chuẩn `page-1...`. Kết quả dùng lại được ánh xạ về ID ảnh hiện tại và ký lại; giữ ngày phân tích gốc.
+
+Với ảnh mới, OCR vẫn chạy trên mọi trang. Chỉ tái sử dụng phân tích khi tất cả trang `readable`, cùng số/thứ tự trang, văn bản trùng sau NFC và khoảng trắng. Không fuzzy-match; giữ số tiền, dấu, chữ hoa/thường, dấu câu và ranh giới trang. Các trích dẫn phải khớp lại với OCR mới, tính lại offset và ID bằng chứng. Một số tiền đổi hoặc trang partial/unreadable buộc phân tích mới. Trích dẫn không khớp khi đối chiếu cache sẽ bỏ cache, không gán nhầm vào ảnh hiện tại.
+
+Mobile gửi tùy chọn `previousAnalysis:{report,analysisToken}` để khôi phục kết quả qua restart Backend. Chỉ nhận báo cáo OpenAI đúng HMAC/model/phiên bản/chính sách; kiểm tra ảnh hoặc toàn bộ text như trên. Khóa chính sách là HMAC của phiên bản, model, quy tắc, safety, rubric, sampling; thay secret/model/quy tắc không dùng lại kết quả cũ. Cần tăng `ANALYSIS_VERSION` khi sửa prompt/schema. Báo cáo cũ không có metadata vẫn đọc/hỏi đáp được với secret cũ nhưng không tự dùng lại cho pipeline mới.
+
+`report.analysis` chứa `version`, `policyId`, `inputFingerprint`, `analyzedAt`, `reuse`. `reuse` bằng `none` (phân tích mới), `images` (cache ảnh), `text` (OCR mới khớp), `saved` (ảnh khớp báo cáo ký từ Mobile). Các trường là một phần chữ ký. Mobile hiển thị nguồn/ngày gốc, có **Đọc lại từ ảnh** gửi `forceRefresh:true` để tạo báo cáo riêng và giữ bản cũ. Không tự lưu báo cáo mới thay thao tác Lưu của người dùng.
+
+`SingleFlight` gộp công việc đồng thời theo ảnh/text, tách luồng đọc lại chủ động. Hủy một subscriber không hủy các subscriber khác; khi hết người chờ, abort truyền tới OpenAI và không ghi cache. Lỗi/schema thiếu không được cache.
+
+Mọi bước dùng `temperature:0` khi được hỗ trợ. Chỉ fallback bỏ tham số khi HTTP400 chỉ rõ `param=temperature` và code `unsupported_parameter/unsupported_value`; ghi nhớ khả năng trong phiên Backend. Điều này giảm biến động sampling, **không bảo đảm tất định**. AI vẫn có thể chọn mã/bằng chứng khác hoặc kiểm chứng khác; OCR ảnh mới cũng có thể khác. Không hứa cùng hợp đồng vật lý luôn cho số phát hiện giống nhau. Cache bảo toàn một kết quả đã kiểm chứng, không chứng minh kết quả đó đầy đủ hoặc đúng với ảnh.
 
 ## JSON cuối cùng và nguồn kết quả
 
@@ -60,7 +82,8 @@ Kiểu wire đầy đủ ở `shared/contracts.ts`; Mobile có bản sao tự ch
         "id": "finding-id",
         "ruleId": "DEPOSIT",
         "category": "deposit",
-        "severity": "low",
+        "checkId": "DEPOSIT_REFUND",
+        "severity": "medium",
         "title": "Xác nhận khoản tiền cọc",
         "reason": "Cần đối chiếu khoản thanh toán trước khi ký.",
         "explanation": "Đoạn được trích ghi tiền cọc là 10.000.000 đồng.",
@@ -87,7 +110,7 @@ Kiểu wire đầy đủ ở `shared/contracts.ts`; Mobile có bản sao tự ch
 
 `title` và `summary` được code tạo; không có nhận định tự do không được kiểm chứng từ model trong hai trường này. `missingInformation` là câu hỏi checklist trung lập do code tạo cho nhóm chưa có phát hiện được kiểm chứng và trang chưa đọc đầy đủ. Nó **không khẳng định** rằng hợp đồng thiếu điều khoản. Báo cáo không có phát hiện cũng không được gọi là an toàn.
 
-`source: "openai"` chỉ xuất hiện trong backend sau khi pipeline dùng provider thành công. Trong unit/integration test, provider được khai báo thay bằng fixture để kiểm tra code; đó không phải bằng chứng đã gọi OpenAI thật. Dữ liệu mẫu Mobile mang `source: "demo"`, không có token xác thực cho API hỏi đáp thật.
+`source: "openai"` chỉ xuất hiện sau khi pipeline dùng provider thành công hoặc khi dùng lại báo cáo OpenAI đã kiểm chứng/xác thực; xem `analysis.reuse` để phân biệt. Trong unit/integration test, provider được khai báo thay bằng fixture để kiểm tra code; đó không phải bằng chứng đã gọi OpenAI thật. Dữ liệu mẫu Mobile mang `source: "demo"`, không có token xác thực cho API hỏi đáp thật.
 
 ## Hai lớp kiểm chứng bằng chứng
 

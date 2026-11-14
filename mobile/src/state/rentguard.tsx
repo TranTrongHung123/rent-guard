@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type PropsWithChildren } from 'react';
 import { Asset } from 'expo-asset';
+import * as Crypto from 'expo-crypto';
+import { fingerprintInput, previousAnalysis } from '@/domain/analysis';
 import { MAX_PAGES, MAX_QUESTION_LENGTH, messageOf, moveItem, normalizeApiUrl, validateSavedRecord } from '@/domain/core';
 import { createDemoAnswer, createDemoRecord } from '@/domain/demo';
 import { managedFileName } from '@/domain/paths';
@@ -21,6 +23,7 @@ interface RentGuardState {
   movePage(id: string, direction: -1 | 1): void;
   clearDraft(): Promise<void>;
   analyze(): Promise<string | null>;
+  reanalyzeRecord(id: string): Promise<string | null>;
   analysisState: 'idle' | 'preparing' | 'analyzing';
   cancelAnalysis(): void;
   openDemo(): Promise<string>;
@@ -50,6 +53,7 @@ export function RentGuardProvider({ children }: PropsWithChildren) {
   const pagesRef = useRef<LocalPage[]>([]);
   const [analysisState, setAnalysisState] = useState<RentGuardState['analysisState']>('idle');
   const analysisRef = useRef<AbortController | null>(null);
+  const analyzingRecordRef = useRef<string | null>(null);
   const pickerBusy = useRef(false);
   const [chatBusy, setChatBusy] = useState(false);
   const chatRef = useRef<string | null>(null);
@@ -136,15 +140,14 @@ export function RentGuardProvider({ children }: PropsWithChildren) {
     await deletePageFiles(old);
   }
 
-  async function analyze(): Promise<string | null> {
+  async function runAnalysis(pages: LocalPage[], forceRefresh = false, consumeDraft = true): Promise<string | null> {
     if (analysisRef.current || pickerBusy.current) return null;
-    if (!pagesRef.current.length) { setError('Hãy chụp hoặc chọn ít nhất một trang hợp đồng.'); return null; }
+    if (!pages.length) { setError('Hãy chụp hoặc chọn ít nhất một trang hợp đồng.'); return null; }
     const controller = new AbortController();
     analysisRef.current = controller;
     setError(null);
     setAnalysisState('preparing');
     try {
-      const pages = [...pagesRef.current];
       const payload: { id: string; dataUrl: string }[] = [];
       let totalBytes = 0;
       for (const page of pages) {
@@ -155,8 +158,13 @@ export function RentGuardProvider({ children }: PropsWithChildren) {
         payload.push({ id: page.id, dataUrl });
       }
       if (controller.signal.aborted) return null;
+      // Expo Crypto is bundled in Expo Go. A browser without secure-context
+      // crypto can still analyze; the backend also computes the fingerprint.
+      const fingerprint = forceRefresh ? null : await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, fingerprintInput(payload)).catch(() => null);
+      const previous = forceRefresh ? undefined : previousAnalysis(itemsRef.current, fingerprint, pages.length);
+      if (controller.signal.aborted) return null;
       setAnalysisState('analyzing');
-      const response = await analyzePages(apiUrl, payload, controller.signal);
+      const response = await analyzePages(apiUrl, payload, controller.signal, { ...(forceRefresh ? { forceRefresh: true } : {}), ...(previous ? { previousAnalysis: previous } : {}) });
       if (controller.signal.aborted) return null;
       const item: SavedAnalysis = { id: response.report?.id, report: response.report, localPages: pages, analysisToken: response.analysisToken, messages: [], isSaved: false };
       if (!validateSavedRecord(item) || item.report.source !== 'openai' || !item.analysisToken ||
@@ -164,10 +172,21 @@ export function RentGuardProvider({ children }: PropsWithChildren) {
         throw new Error('Báo cáo máy chủ không hợp lệ hoặc thiếu trang. Ảnh của bạn được giữ lại để thử lại.');
       }
       updateItems((current) => [item, ...current]);
-      updatePages([]);
+      if (consumeDraft) updatePages([]);
       return item.id;
     } catch (cause) { if (!controller.signal.aborted) setError(messageOf(cause)); return null; }
     finally { analysisRef.current = null; setAnalysisState('idle'); }
+  }
+
+  async function analyze() { return runAnalysis([...pagesRef.current]); }
+
+  async function reanalyzeRecord(id: string): Promise<string | null> {
+    if (analysisRef.current || pickerBusy.current) return null;
+    const record = getRecord(id);
+    if (!record || record.report.source !== 'openai') { setError('Chỉ đọc lại được báo cáo AI có ảnh gốc trên máy.'); return null; }
+    analyzingRecordRef.current = id;
+    try { return await runAnalysis([...record.localPages], true, false); }
+    finally { analyzingRecordRef.current = null; }
   }
 
   async function openDemo(): Promise<string> {
@@ -194,6 +213,7 @@ export function RentGuardProvider({ children }: PropsWithChildren) {
     return enqueue(async () => {
       try {
         if (chatRef.current === id) throw new Error('Hãy đợi câu trả lời hoàn tất trước khi xóa hợp đồng.');
+        if (analyzingRecordRef.current === id) throw new Error('Hãy đợi đọc lại ảnh hoàn tất trước khi xóa hợp đồng.');
         const item = getRecord(id);
         await removeRecord(id);
         updateItems((current) => current.filter((record) => record.id !== id));
@@ -236,7 +256,7 @@ export function RentGuardProvider({ children }: PropsWithChildren) {
     finally { chatRef.current = null; setChatBusy(false); }
   }
 
-  return <Context.Provider value={{ ready, error, clearError: () => setError(null), apiUrl, setApiUrl, checkBackend, draftPages, pickImages, removePage, movePage, clearDraft, analyze, analysisState, cancelAnalysis: () => analysisRef.current?.abort(), openDemo, records: items.filter((item) => item.isSaved), getRecord, saveRecord, deleteRecord, sendMessage, chatBusy }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ ready, error, clearError: () => setError(null), apiUrl, setApiUrl, checkBackend, draftPages, pickImages, removePage, movePage, clearDraft, analyze, reanalyzeRecord, analysisState, cancelAnalysis: () => analysisRef.current?.abort(), openDemo, records: items.filter((item) => item.isSaved), getRecord, saveRecord, deleteRecord, sendMessage, chatBusy }}>{children}</Context.Provider>;
 }
 
 export function useRentGuard() {

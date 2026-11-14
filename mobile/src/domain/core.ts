@@ -38,6 +38,14 @@ export function validateSavedRecord(value: unknown): value is SavedAnalysis {
     !Array.isArray(value.localPages) || !Array.isArray(value.messages) ||
     (report.source === 'openai' && !value.analysisToken.trim())) return false;
 
+  if (report.analysis !== undefined) {
+    const analysis = report.analysis;
+    if (!isObject(analysis) || !isText(analysis.version) || !isDate(analysis.analyzedAt) ||
+      typeof analysis.policyId !== 'string' || !/^[a-f0-9]{64}$/.test(analysis.policyId) ||
+      typeof analysis.inputFingerprint !== 'string' || !/^[a-f0-9]{64}$/.test(analysis.inputFingerprint) ||
+      !['none', 'images', 'text', 'saved'].includes(String(analysis.reuse))) return false;
+  }
+
   const pages = new Map<string, { pageNumber: number; status: string; text: string }>();
   for (const [index, page] of report.pages.entries()) {
     if (!isObject(page) || !isText(page.id) || pages.has(page.id) || page.pageNumber !== index + 1 ||
@@ -75,6 +83,7 @@ export function validateSavedRecord(value: unknown): value is SavedAnalysis {
   const findingIds = new Set<string>();
   for (const finding of report.findings) {
     if (!isObject(finding) || !isText(finding.id) || findingIds.has(finding.id) || !isText(finding.ruleId) ||
+      (finding.checkId !== undefined && !isText(finding.checkId)) ||
       !['deposit', 'rent', 'fees', 'termination', 'repairs', 'other'].includes(String(finding.category)) ||
       !['high', 'medium', 'low'].includes(String(finding.severity)) || !isText(finding.title) ||
       !isText(finding.reason) || !isText(finding.explanation) || !isText(finding.suggestedQuestion) ||
