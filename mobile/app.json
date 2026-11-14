@@ -1,0 +1,81 @@
+{
+  "expo": {
+    "name": "RentGuard",
+    "slug": "rentguard",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/rentguard-icon.png",
+    "scheme": "rentguard",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "bundleIdentifier": "vn.rentguard.app",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocalNetworkUsageDescription": "RentGuard kết nối với máy chủ phân tích hợp đồng trên laptop trong cùng mạng Wi-Fi.",
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true,
+          "NSAllowsArbitraryLoads": true
+        }
+      }
+    },
+    "android": {
+      "package": "vn.rentguard.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#173E35",
+        "foregroundImage": "./assets/images/rentguard-icon.png"
+      },
+      "predictiveBackGestureEnabled": true,
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/rentguard-favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#173E35",
+          "image": "./assets/images/rentguard-icon.png",
+          "imageWidth": 180
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Cho phép RentGuard chọn ảnh hợp đồng để phân tích.",
+          "cameraPermission": "Cho phép RentGuard chụp các trang hợp đồng thuê nhà.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
+      "expo-asset"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "362c226f-79c8-4139-8075-4539f0f2f9b3"
+      }
+    },
+    "owner": "trantronghung"
+  }
+}

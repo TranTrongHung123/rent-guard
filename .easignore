@@ -1,0 +1,38 @@
+# EAS reads this file at the root of the Git repository.
+# Run EAS commands from mobile/; keep eas.json and app.json there.
+.git
+node_modules/
+.expo/
+.data/
+.claude/
+.vscode/
+.kotlin/
+test-results/
+dist/
+web-build/
+coverage/
+.env
+.env.*
+!.env.example
+*.log
+*.apk
+credentials.json
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision
+*.orig.*
+*.tsbuildinfo
+.DS_Store
+.metro-health-check*
+expo-env.d.ts
+
+# Backend secrets, local artifacts and documents do not belong in the mobile build.
+/backend/
+/docs/
+/artifacts/
+/mobile/android/
+/mobile/ios/

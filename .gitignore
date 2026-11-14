@@ -10,3 +10,16 @@ artifacts/
 **/.expo/
 **/test-results/
 *.log
+
+# Local agent configuration and signing credentials
+.claude/
+credentials.json
+*.keystore
+*.jks
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision
+*.tsbuildinfo
+.DS_Store

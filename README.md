@@ -74,7 +74,9 @@ shared/contracts.ts      hợp đồng dữ liệu API chuẩn
 docs/                    PRD, thiết kế AI, đối chiếu triển khai và kiểm thử
 ```
 
-Mobile dùng bản type tự chứa `src/types/contracts.ts` được sinh từ `shared/contracts.ts`, để EAS build từ repo Mobile hiện có. Khi đổi shared type, chạy `npm run sync:contracts` trong Mobile; `npm run check:contracts` phát hiện sai lệch. Không khởi tạo lại Mobile hoặc đổi Expo SDK.
+Toàn bộ dự án được quản lý bởi **một Git repository tại thư mục gốc**: `backend/`, `mobile/`, `shared/` và `docs/` đều là source bình thường. Không tạo Git repository hoặc submodule riêng trong `mobile/`. Chạy `git add`, `git commit` và `git push` từ thư mục gốc.
+
+Mobile dùng bản type tự chứa `src/types/contracts.ts` được sinh từ `shared/contracts.ts`. Khi đổi shared type, chạy `npm run sync:contracts` trong Mobile; `npm run check:contracts` phát hiện sai lệch. Tiếp tục chạy EAS trong `mobile/`, với `eas.json` ở đó; file `.easignore` **tại gốc repository** loại Backend, khóa, artifact và cấu hình cục bộ khỏi gói upload. Không khởi tạo lại Mobile hoặc đổi Expo SDK.
 
 ```powershell
 cd D:\Projects\rent-guard\backend
